@@ -1,7 +1,7 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
-  /* config options here */
-};
+  // Allow react-grid-layout and recharts to work
+}
 
-export default nextConfig;
+export default nextConfig
