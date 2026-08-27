@@ -2,6 +2,12 @@
 
 import { MoreVertical, Copy, Trash2, TrendingUp, TrendingDown, GripVertical, Pencil } from "lucide-react"
 import { useState, useRef } from "react"
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu"
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { normalizeChartData, seriesLabel, compactNumber, truncateLabel } from "@/lib/widget-data"
 
@@ -44,7 +50,6 @@ function ChartFrame({ children }: { children: React.ReactElement }) {
 }
 
 export function WidgetCard({ widget, onDelete, onDuplicate, onRename }: WidgetCardProps) {
-  const [showMenu, setShowMenu] = useState(false)
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(widget.title)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -52,7 +57,6 @@ export function WidgetCard({ widget, onDelete, onDuplicate, onRename }: WidgetCa
   const startRename = () => {
     setRenameValue(widget.title)
     setIsRenaming(true)
-    setShowMenu(false)
     setTimeout(() => inputRef.current?.select(), 0)
   }
 
@@ -224,6 +228,7 @@ export function WidgetCard({ widget, onDelete, onDuplicate, onRename }: WidgetCa
                 if (e.key === "Escape") setIsRenaming(false)
               }}
               onClick={e => e.stopPropagation()}
+              onMouseDown={e => e.stopPropagation()}
               className="flex-1 font-semibold text-gray-900 bg-white border border-blue-400 rounded px-2 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-text"
             />
           ) : (
@@ -236,41 +241,33 @@ export function WidgetCard({ widget, onDelete, onDuplicate, onRename }: WidgetCa
             </h3>
           )}
         </div>
-        <div className="relative shrink-0 ml-2">
-          <button
-            onClick={() => setShowMenu(!showMenu)}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <MoreVertical className="w-4 h-4" />
-          </button>
-          {showMenu && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-              <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-20">
-                <button
-                  onClick={startRename}
-                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                >
-                  <Pencil className="w-4 h-4 mr-2" />
-                  Rename
-                </button>
-                <button
-                  onClick={() => { onDuplicate(); setShowMenu(false) }}
-                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                >
-                  <Copy className="w-4 h-4 mr-2" />
-                  Duplicate
-                </button>
-                <button
-                  onClick={() => { onDelete(); setShowMenu(false) }}
-                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete
-                </button>
-              </div>
-            </>
-          )}
+        <div className="shrink-0 ml-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              onMouseDown={e => e.stopPropagation()}
+              className="text-gray-400 hover:text-gray-600 transition-colors outline-none"
+              aria-label="Widget options"
+            >
+              <MoreVertical className="w-4 h-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" onMouseDown={e => e.stopPropagation()}>
+              <DropdownMenuItem onSelect={() => startRename()}>
+                <Pencil className="w-4 h-4 mr-2" />
+                Rename
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onDuplicate()}>
+                <Copy className="w-4 h-4 mr-2" />
+                Duplicate
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => onDelete()}
+                className="text-red-600 focus:text-red-600"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
       <div className="flex-1 min-h-0 p-3">
