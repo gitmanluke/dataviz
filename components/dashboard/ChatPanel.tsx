@@ -5,6 +5,7 @@ import { Sparkles, X, Send, Loader2, BarChart3, LineChart, PieChart, Hash, Table
 import { Button } from "@/components/ui/button"
 import { useDataSources } from "@/hooks/useDataSources"
 import { useSnowLeopard, type DetectedWidget } from "@/hooks/useSnowLeopard"
+import { parseChartIntent, isRefinement, retypeWidget } from "@/lib/widget-data"
 import type { DataSource, Widget } from "@/lib/types"
 
 interface Message {
@@ -39,6 +40,7 @@ export function ChatPanel({ onClose, onAddWidget }: ChatPanelProps) {
     timestamp: new Date(),
   }])
   const [input, setInput] = useState("")
+  const [lastWidget, setLastWidget] = useState<DetectedWidget | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const { isLoading, retrieve } = useSnowLeopard({
@@ -71,6 +73,32 @@ export function ChatPanel({ onClose, onAddWidget }: ChatPanelProps) {
       { id: aiMsgId, text: "", sender: "ai", timestamp: new Date(), isLoading: true },
     ])
 
+    // Follow-up like "make that a pie chart" — re-render the last widget's data
+    // as a new type without another query.
+    const intent = parseChartIntent(query)
+    if (intent && lastWidget && isRefinement(query)) {
+      const retyped = retypeWidget(lastWidget.data, lastWidget.widgetType, intent)
+      if (retyped) {
+        const newWidget: DetectedWidget = {
+          ...lastWidget,
+          widgetType: retyped.type,
+          data: retyped.data,
+        }
+        setLastWidget(newWidget)
+        setMessages(prev => prev.map(m =>
+          m.id === aiMsgId
+            ? {
+                ...m,
+                isLoading: false,
+                text: `Here's the same data as a ${retyped.type.replace("-", " ")}.`,
+                detectedWidget: newWidget,
+              }
+            : m
+        ))
+        return
+      }
+    }
+
     if (!selectedSource) {
       setMessages(prev => prev.map(m =>
         m.id === aiMsgId
@@ -95,6 +123,7 @@ export function ChatPanel({ onClose, onAddWidget }: ChatPanelProps) {
       // Use the natural language explanation as dialogue; attach widget if data was found
       const dialogueText = result.explanation ?? `Here's what I found: a ${result.widgetType.replace("-", " ")} based on your query.`
 
+      setLastWidget(result)
       setMessages(prev => prev.map(m =>
         m.id === aiMsgId
           ? { ...m, text: dialogueText, isLoading: false, detectedWidget: result }

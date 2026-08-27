@@ -1,6 +1,7 @@
-import type { ChartData } from "@/lib/widget-data"
+import { type ChartData, parseChartIntent, isChartType } from "@/lib/widget-data"
+import type { WidgetType } from "@/lib/types"
 
-export type WidgetType = "line-chart" | "bar-chart" | "pie-chart" | "stat" | "table"
+export type { WidgetType }
 
 export interface DetectedWidget {
   widgetType: WidgetType
@@ -115,14 +116,42 @@ export function detectWidget(
   )
 
   const wantsPie = PIE_INTENT.test(userQuery)
+  const intent = parseChartIntent(userQuery)
   const xKey = dateKeys[0] ?? categoryKeys[0]
   const isTimeAxis = dateKeys.length >= 1
+  const chartable = Boolean(xKey) && measureKeys.length >= 1
+
+  // Explicit "table", or an explicit chart request we can't satisfy → table.
+  if (intent === "table" || (intent && intent !== "stat" && !chartable)) {
+    return {
+      widgetType: "table",
+      title,
+      data: rows,
+      confidence: keys.length >= 4 ? "high" : "low",
+      sql,
+    }
+  }
+
+  // Explicit "single number".
+  if (intent === "stat" && chartable) {
+    return {
+      widgetType: "stat",
+      title,
+      data: { value: Number(rows[0][measureKeys[0]]), change: 0, trend: "up" },
+      confidence: "medium",
+      sql,
+    }
+  }
 
   // Rule 2: an axis (date or category) + exactly one measure
   if (xKey && measureKeys.length === 1) {
-    const usePie = !isTimeAxis && wantsPie && rows.length <= 8
+    const natural: WidgetType = isTimeAxis
+      ? "line-chart"
+      : wantsPie && rows.length <= 8
+        ? "pie-chart"
+        : "bar-chart"
     return {
-      widgetType: isTimeAxis ? "line-chart" : usePie ? "pie-chart" : "bar-chart",
+      widgetType: intent && isChartType(intent) ? intent : natural,
       title,
       data: singleSeries(rows, xKey, measureKeys[0]),
       confidence: "high",
@@ -130,10 +159,22 @@ export function detectWidget(
     }
   }
 
-  // Rule 3: an axis + several measures → multi-series bar (or line for a time axis)
+  // Rule 3: an axis + several measures
   if (xKey && measureKeys.length > 1) {
+    // A pie can only show one series — collapse to the first measure.
+    if (intent === "pie-chart") {
+      return {
+        widgetType: "pie-chart",
+        title,
+        data: singleSeries(rows, xKey, measureKeys[0]),
+        confidence: "medium",
+        sql,
+      }
+    }
+    const useLine =
+      intent === "line-chart" || (isTimeAxis && intent !== "bar-chart")
     return {
-      widgetType: isTimeAxis ? "line-chart" : "bar-chart",
+      widgetType: useLine ? "line-chart" : "bar-chart",
       title,
       data: multiSeries(rows, xKey, measureKeys),
       confidence: "medium",
