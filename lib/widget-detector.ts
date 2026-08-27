@@ -3,7 +3,7 @@ import type { WidgetType, WidgetSpec } from "@/lib/types"
 
 export type { WidgetType }
 
-const DATE_PATTERNS = /date|time|month|year|day|week|period|quarter/i
+const DATE_PATTERNS = /date|time|month|year|day|week|period|quarter|decade|era/i
 
 // Columns that are identifiers, not measures — excluded from chart detection
 // (they still appear in the table view).
@@ -97,6 +97,18 @@ export function detectSpec(rawData: unknown, userQuery: string): WidgetSpec {
       title,
       xKey: axis,
       series: measureKeys,
+      sort: NONE,
+    }
+  }
+
+  // Exactly one axis-ish column + one measure, both numeric (e.g. decade, count)
+  // → treat the first as the axis.
+  if (keys.length === 2 && measureKeys.length === 2) {
+    return {
+      type: isDateLike(keys[0]) ? "line-chart" : "bar-chart",
+      title,
+      xKey: keys[0],
+      series: [keys[1]],
       sort: NONE,
     }
   }
