@@ -12,22 +12,22 @@ export interface WidgetResult {
   usedAgent?: boolean
 }
 
-export function useSnowLeopard({ dataSourceId }: { dataSourceId: string }) {
+export function useWidgetAgent({ dataSourceId }: { dataSourceId: string }) {
   const [isLoading, setIsLoading] = useState(false)
 
-  const retrieve = useCallback(
+  const generate = useCallback(
     async (userQuery: string, priorSpec?: WidgetSpec): Promise<WidgetResult | null> => {
       if (!dataSourceId) return null
       setIsLoading(true)
       try {
-        const res = await fetch("/api/ai/retrieve", {
+        const res = await fetch("/api/ai/widget", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userQuery, dataSourceId, priorSpec }),
         })
         if (!res.ok) {
           const err = (await res.json()) as { error?: string }
-          throw new Error(err.error ?? "Retrieve failed")
+          throw new Error(err.error ?? "Widget generation failed")
         }
         return (await res.json()) as WidgetResult
       } finally {
@@ -37,5 +37,5 @@ export function useSnowLeopard({ dataSourceId }: { dataSourceId: string }) {
     [dataSourceId]
   )
 
-  return { isLoading, retrieve }
+  return { isLoading, generate }
 }

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import { Sparkles, X, Send, Loader2, BarChart3, LineChart, PieChart, Hash, Table } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useDataSources } from "@/hooks/useDataSources"
-import { useSnowLeopard, type WidgetResult } from "@/hooks/useSnowLeopard"
+import { useWidgetAgent, type WidgetResult } from "@/hooks/useWidgetAgent"
 import { parseChartIntent, isRefinement, retypeSpec } from "@/lib/widget-data"
 import type { DataSource, Widget } from "@/lib/types"
 
@@ -43,7 +43,7 @@ export function ChatPanel({ onClose, onAddWidget }: ChatPanelProps) {
   const [lastResult, setLastResult] = useState<WidgetResult | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const { isLoading, retrieve } = useSnowLeopard({
+  const { isLoading, generate } = useWidgetAgent({
     dataSourceId: selectedSource?.id ?? "",
   })
 
@@ -103,7 +103,7 @@ export function ChatPanel({ onClose, onAddWidget }: ChatPanelProps) {
     }
 
     try {
-      const result = await retrieve(query, lastResult?.spec)
+      const result = await generate(query, lastResult?.spec)
 
       if (!result) {
         setMessages(prev => prev.map(m =>
