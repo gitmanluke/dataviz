@@ -23,6 +23,26 @@ The core loop already works:
    from the returned rows; you preview it and add it to the grid.
 4. Dashboards, widgets, and layouts persist (localStorage today).
 
+## Where it stands (2026-08-27)
+
+Verified by installing and building from a clean checkout:
+
+- **Builds clean.** `npm run build` passes (Next 16, Turbopack), TypeScript OK.
+- **`npm install` needs `--legacy-peer-deps`** — `react-day-picker` (a dead,
+  unused shadcn dependency) pins an old `date-fns`. Fix: delete
+  `components/ui/calendar.tsx` and drop `react-day-picker` + `date-fns` from
+  `package.json` (neither is imported anywhere in `app/`, `components/` outside
+  ui, `hooks/`, or `lib/`).
+- **`npm run lint` — 7 errors.** 3 are the load-from-localStorage-on-mount
+  effects in the `hooks/` (go away with the SQLite migration); 2 are in
+  vendored `components/ui/` (chart, sidebar); 1 in `ChatPanel`.
+- **No tests, no typecheck script.**
+- **Demo needs BYO credentials** — the only data source type is Snow Leopard,
+  which needs an API key + uploaded datafile. Nothing works out of the box.
+- Last real work was 2026-03-30 ("small changes"). The full UI and the Snow
+  Leopard happy path are built; everything in _Target architecture_ below is
+  not started.
+
 ## Goals, in priority order
 
 1. **Presentable portfolio piece.** Clean code, honest UI, a demo a reviewer
@@ -112,6 +132,24 @@ setup, so:
 Personal use — e.g. importing a CSV of job applications and building a tracker —
 is just one thing the general tool can do. Nothing in the codebase should
 hard-code it.
+
+## Suggested order of work
+
+1. **Warm-up:** run it locally (`npm i --legacy-peer-deps && npm run dev`),
+   click through, then clean the dead `react-day-picker`/`date-fns`/`calendar`
+   deps so `npm install` works with no flags.
+2. **Prisma + SQLite, `data_sources` first.** Smallest entity, and it's the one
+   entangled with the secrets fix. Add Prisma, model `DataSource`, add
+   `/api/data-sources` route handlers, swap `useDataSources` internals from
+   localStorage to `fetch`. Then make `/api/ai/retrieve` and `/verify` take a
+   `dataSourceId` and look the key up server-side; remove `apiKey` from client
+   types and payloads. This lands the security fix and proves the pattern.
+3. **`dashboards` + `widgets` to Prisma** using the same recipe; add the
+   one-time localStorage import.
+4. **`QueryEngine` abstraction** + bundled sample SQLite data source so the
+   app works with no signup.
+5. **Cleanup pass:** remove fake UI, add `typecheck`/`test` scripts + Vitest +
+   CI, write the README.
 
 ## "v1 done" checklist
 
