@@ -148,9 +148,28 @@ hard-code it.
 3. **`Dashboard` + `Widget` to Prisma** using the same recipe; add the
    one-time localStorage import.
 4. **`QueryEngine` abstraction** + bundled sample SQLite data source so the
-   app works with no signup.
+   app works with no signup — **and the widget-system rework** (see below).
 5. **Cleanup pass:** remove fake UI, add `typecheck`/`test` scripts + Vitest +
    CI, write the README.
+
+### Widget system rework (part of milestone 4)
+
+Real data exposed that `lib/widget-detector.ts` and `WidgetCard` don't share a
+data contract. Concrete failure: "top 5 superheroes by appearances" returned
+`{ id, name, appearance_count }`; the detector's "1 string + multiple numerics"
+rule fired (because `id` counts as numeric) and emitted `{ name, id,
+appearance_count }`, but `WidgetCard`'s bar renderer is hardcoded to
+`<Bar dataKey="value">` and `height={200}`, so it drew axes and no bars.
+
+Needs:
+- Detector: drop `id` / `*_id` / key-like columns from metric detection (keep
+  them for the table view); pick the value column deliberately; revisit
+  pie-vs-bar (ranking queries should stay bars even at ≤8 rows).
+- One normalized shape for every chart type, or an explicit `{ nameKey,
+  valueKeys[] }` in the detector output; renderer supports multi-series bars.
+- Per-type default widget sizes (`hooks/useWidgets.ts` hardcodes `w:4 h:3`);
+  charts fill the widget height instead of a fixed 200px; rotate/truncate long
+  axis labels.
 
 ## "v1 done" checklist
 
@@ -161,6 +180,7 @@ hard-code it.
 - [ ] One bundled zero-setup data source (sample SQLite), with matching
       example prompts in `ChatPanel`
 - [ ] NL-query → widget flow solid across all five widget types on the sample
+      (blocked by the widget-system rework — see milestone 4)
 - [ ] Remove dead/fake UI (alert toggles, non-functional refresh interval)
 - [ ] `npm run typecheck` + `npm run test` scripts; Vitest on `widget-detector`
       and route handlers; CI running lint + typecheck + test + build
