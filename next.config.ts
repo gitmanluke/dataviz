@@ -1,8 +1,8 @@
 import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
-  // Keep Prisma's query engine out of the bundle so it loads at runtime.
-  serverExternalPackages: ["@prisma/client"],
+  // Keep these out of the server bundle so they load at runtime.
+  serverExternalPackages: ["@prisma/client", "@anthropic-ai/sdk"],
 }
 
 export default nextConfig

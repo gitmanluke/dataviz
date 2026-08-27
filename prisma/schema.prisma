@@ -21,6 +21,11 @@ model DataSource {
   createdAt    DateTime @default(now())
 }
 
+model Setting {
+  key   String @id
+  value String // encrypted for secrets (see lib/crypto.ts)
+}
+
 model Dashboard {
   id          String   @id @default(cuid())
   name        String

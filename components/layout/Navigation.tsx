@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Database, LayoutDashboard } from "lucide-react"
+import { Home, Database, LayoutDashboard, Settings } from "lucide-react"
 
 export function Navigation() {
   const pathname = usePathname()
@@ -46,6 +46,18 @@ export function Navigation() {
               >
                 <Database className="w-4 h-4 mr-2" />
                 Data Sources
+              </Link>
+
+              <Link
+                href="/settings"
+                className={`inline-flex items-center px-3 py-2 rounded-md ${
+                  isActive("/settings")
+                    ? "bg-blue-50 text-blue-700"
+                    : "text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Settings
               </Link>
             </div>
           </div>
