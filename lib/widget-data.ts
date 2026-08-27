@@ -83,3 +83,19 @@ export function seriesLabel(key: string): string {
     .replace(/\b\w/g, c => c.toUpperCase())
     .trim()
 }
+
+/** Compact number for axis ticks: 3093 → "3.1k", 1_200_000 → "1.2M". */
+export function compactNumber(value: unknown): string {
+  const n = Number(value)
+  if (!isFinite(n)) return String(value ?? "")
+  const abs = Math.abs(n)
+  if (abs >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`
+  if (abs >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}k`
+  return String(n)
+}
+
+/** Truncate a category-axis label so it doesn't blow out the chart. */
+export function truncateLabel(value: unknown, max = 16): string {
+  const s = String(value ?? "")
+  return s.length > max ? `${s.slice(0, max - 1)}…` : s
+}

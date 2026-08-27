@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
-import { widgetToClient } from "@/lib/dashboards"
+import { widgetToClient, defaultSizeFor } from "@/lib/dashboards"
 import type { LayoutItem, Widget } from "@/lib/types"
 
 // GET /api/dashboards/:id/widgets -> { widgets, layouts }
@@ -48,6 +48,7 @@ export async function POST(
     select: { y: true, h: true },
   })
   const nextY = existing.reduce((max, w) => Math.max(max, w.y + w.h), 0)
+  const size = defaultSizeFor(body.type)
 
   const row = await prisma.widget.create({
     data: {
@@ -57,10 +58,7 @@ export async function POST(
       data: JSON.stringify(body.data ?? null),
       x: 0,
       y: nextY,
-      w: 4,
-      h: 3,
-      minW: 2,
-      minH: 2,
+      ...size,
     },
   })
 

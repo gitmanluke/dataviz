@@ -51,3 +51,15 @@ export function safeParse(json: string): unknown {
     return null
   }
 }
+
+/** Sensible starting grid size for a new widget, by type (12-col grid). */
+export function defaultSizeFor(type: string): { w: number; h: number; minW: number; minH: number } {
+  switch (type) {
+    case "stat":
+      return { w: 3, h: 2, minW: 2, minH: 2 }
+    case "table":
+      return { w: 8, h: 4, minW: 3, minH: 3 }
+    default: // line-chart | bar-chart | pie-chart
+      return { w: 6, h: 4, minW: 3, minH: 3 }
+  }
+}

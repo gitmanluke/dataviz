@@ -3,7 +3,7 @@
 import { MoreVertical, Copy, Trash2, TrendingUp, TrendingDown, GripVertical, Pencil } from "lucide-react"
 import { useState, useRef } from "react"
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
-import { normalizeChartData, seriesLabel } from "@/lib/widget-data"
+import { normalizeChartData, seriesLabel, compactNumber, truncateLabel } from "@/lib/widget-data"
 
 interface WidgetCardProps {
   widget: {
@@ -19,10 +19,29 @@ interface WidgetCardProps {
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4']
 
+const AXIS = "#6b7280"
+const GRID = "#e5e7eb"
+
 // Stable label renderer — must not be defined inline or inside a component
 // to avoid Recharts treating it as a new component on every render (causes infinite re-renders)
 const PieLabel = ({ name, percent }: { name?: string; percent?: number }) =>
-  `${name ?? ''} ${((percent ?? 0) * 100).toFixed(0)}%`
+  (percent ?? 0) >= 0.04
+    ? `${truncateLabel(name, 12)} ${((percent ?? 0) * 100).toFixed(0)}%`
+    : ""
+
+const truncTick = (v: unknown) => truncateLabel(v, 16)
+const compactTick = (v: unknown) => compactNumber(v)
+
+// Makes a recharts chart fill the widget body at any size.
+function ChartFrame({ children }: { children: React.ReactElement }) {
+  return (
+    <div className="h-full w-full min-h-0">
+      <ResponsiveContainer width="100%" height="100%">
+        {children}
+      </ResponsiveContainer>
+    </div>
+  )
+}
 
 export function WidgetCard({ widget, onDelete, onDuplicate, onRename }: WidgetCardProps) {
   const [showMenu, setShowMenu] = useState(false)
@@ -48,13 +67,19 @@ export function WidgetCard({ widget, onDelete, onDuplicate, onRename }: WidgetCa
       case "line-chart": {
         const { rows, xKey, series } = normalizeChartData(widget.data)
         return (
-          <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={rows}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey={xKey} stroke="#6b7280" fontSize={12} />
-              <YAxis stroke="#6b7280" fontSize={12} />
-              <Tooltip />
-              {series.length > 1 && <Legend />}
+          <ChartFrame>
+            <LineChart data={rows} margin={{ top: 4, right: 12, bottom: 4, left: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+              <XAxis
+                dataKey={xKey}
+                stroke={AXIS}
+                tick={{ fontSize: 11 }}
+                tickFormatter={truncTick}
+                minTickGap={16}
+              />
+              <YAxis stroke={AXIS} tick={{ fontSize: 11 }} width={44} tickFormatter={compactTick} />
+              <Tooltip formatter={(v) => compactNumber(v)} />
+              {series.length > 1 && <Legend wrapperStyle={{ fontSize: 12 }} />}
               {series.map((key, i) => (
                 <Line
                   key={key}
@@ -67,25 +92,34 @@ export function WidgetCard({ widget, onDelete, onDuplicate, onRename }: WidgetCa
                 />
               ))}
             </LineChart>
-          </ResponsiveContainer>
+          </ChartFrame>
         )
       }
 
       case "bar-chart": {
         const { rows, xKey, series } = normalizeChartData(widget.data)
         return (
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={rows}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey={xKey} stroke="#6b7280" fontSize={12} />
-              <YAxis stroke="#6b7280" fontSize={12} />
-              <Tooltip />
-              {series.length > 1 && <Legend />}
+          <ChartFrame>
+            <BarChart data={rows} margin={{ top: 4, right: 12, bottom: 4, left: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+              <XAxis
+                dataKey={xKey}
+                stroke={AXIS}
+                tick={{ fontSize: 11 }}
+                tickFormatter={truncTick}
+                interval={0}
+                angle={-30}
+                textAnchor="end"
+                height={64}
+              />
+              <YAxis stroke={AXIS} tick={{ fontSize: 11 }} width={44} tickFormatter={compactTick} />
+              <Tooltip formatter={(v) => compactNumber(v)} />
+              {series.length > 1 && <Legend wrapperStyle={{ fontSize: 12 }} />}
               {series.map((key, i) => (
-                <Bar key={key} dataKey={key} name={seriesLabel(key)} fill={COLORS[i % COLORS.length]} />
+                <Bar key={key} dataKey={key} name={seriesLabel(key)} fill={COLORS[i % COLORS.length]} radius={[3, 3, 0, 0]} />
               ))}
             </BarChart>
-          </ResponsiveContainer>
+          </ChartFrame>
         )
       }
 
@@ -93,7 +127,7 @@ export function WidgetCard({ widget, onDelete, onDuplicate, onRename }: WidgetCa
         const { rows, xKey, series } = normalizeChartData(widget.data)
         const valueKey = series[0] ?? "value"
         return (
-          <ResponsiveContainer width="100%" height={200}>
+          <ChartFrame>
             <PieChart>
               <Pie
                 data={rows}
@@ -103,24 +137,24 @@ export function WidgetCard({ widget, onDelete, onDuplicate, onRename }: WidgetCa
                 label={PieLabel}
                 nameKey={xKey}
                 dataKey={valueKey}
-                outerRadius={60}
+                outerRadius="80%"
                 fill="#8884d8"
               >
                 {rows.map((_entry, index: number) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip />
+              <Tooltip formatter={(v) => compactNumber(v)} />
             </PieChart>
-          </ResponsiveContainer>
+          </ChartFrame>
         )
       }
 
       case "stat": {
         const statData = widget.data as { value: number; change: number; trend: string }
         return (
-          <div className="py-8">
-            <div className="text-4xl font-bold text-gray-900 mb-2">
+          <div className="h-full flex flex-col justify-center">
+            <div className="text-4xl font-bold text-gray-900 mb-2 tabular-nums">
               {typeof statData.value === 'number' && statData.value > 1000
                 ? statData.value.toLocaleString()
                 : statData.value}
@@ -142,7 +176,7 @@ export function WidgetCard({ widget, onDelete, onDuplicate, onRename }: WidgetCa
       case "table": {
         const tableData = widget.data as Array<Record<string, unknown>>
         return (
-          <div className="overflow-x-auto">
+          <div className="h-full overflow-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200">
@@ -239,7 +273,7 @@ export function WidgetCard({ widget, onDelete, onDuplicate, onRename }: WidgetCa
           )}
         </div>
       </div>
-      <div className="p-4 flex-1 overflow-auto">
+      <div className="flex-1 min-h-0 p-3">
         {renderContent()}
       </div>
     </div>
