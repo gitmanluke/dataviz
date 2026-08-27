@@ -2,17 +2,19 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { snowLeopardEngine } from "@/lib/engines/snowleopard"
 import { QueryError } from "@/lib/query-engine"
-import { detectSpec } from "@/lib/widget-detector"
+import { resolveSpec } from "@/lib/viz"
+import type { WidgetSpec } from "@/lib/types"
 
 interface WidgetRequest {
   userQuery: string
   dataSourceId: string
+  priorSpec?: WidgetSpec
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as Partial<WidgetRequest>
-    const { userQuery, dataSourceId } = body
+    const { userQuery, dataSourceId, priorSpec } = body
 
     if (!userQuery || !dataSourceId) {
       return NextResponse.json(
@@ -36,7 +38,7 @@ export async function POST(request: NextRequest) {
       throw error
     }
 
-    const spec = detectSpec(result.rows, userQuery)
+    const { spec, usedAgent } = await resolveSpec(result, userQuery, priorSpec)
 
     return NextResponse.json({
       spec,
@@ -44,7 +46,7 @@ export async function POST(request: NextRequest) {
       sql: result.sql,
       explanation: result.explanation,
       truncated: result.truncated,
-      usedAgent: false,
+      usedAgent,
     })
   } catch (error) {
     console.error("[ai/widget] Error:", error)
