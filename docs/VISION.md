@@ -174,6 +174,15 @@ Needs:
 - Per-type default widget sizes (`hooks/useWidgets.ts` hardcodes `w:4 h:3`);
   charts fill the widget height instead of a fixed 200px; rotate/truncate long
   axis labels.
+- **Intent-driven chart type:** parse the query for "pie / bar / line / table /
+  number / metric" and use that type when the data supports it, instead of the
+  shape heuristic. Today the query text only sets the widget title —
+  "pie chart of X" and "bar chart of X" produce identical widgets.
+- **Conversational follow-up:** `ChatPanel` has no memory — each prompt is
+  independent, so "make that a pie chart instead" isn't understood. Keep the
+  last produced widget in `ChatPanel` state; if the next message is a pure
+  presentation change and the data is compatible, re-render that data as the
+  new type with no SnowLeopard call. Anything else → normal retrieval.
 
 ## "v1 done" checklist
 
