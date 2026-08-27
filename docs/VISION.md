@@ -23,20 +23,22 @@ The core loop already works:
    from the returned rows; you preview it and add it to the grid.
 4. Dashboards, widgets, and layouts persist (localStorage today).
 
-## Where it stands (2026-08-27)
+## Where it stands (updated 2026-08-27)
 
-Verified by installing and building from a clean checkout:
-
+- **Data sources persist in local SQLite via Prisma 6**, and SnowLeopard API
+  keys are encrypted at rest and never leave the server (branch
+  `feat/prisma-data-sources`). Retrieval routes take a `dataSourceId`.
+- **Dashboards + widgets still on localStorage** — next milestone, same recipe.
 - **Builds clean.** `npm run build` passes (Next 16, Turbopack), TypeScript OK.
-- **`npm install` works with no flags** (warm-up cleanup done — removed the
-  dead `react-day-picker` / `date-fns` / `calendar.tsx`). 3 `npm audit`
-  warnings remain, all cleared by a `next` 16.2.1 → 16.3.x bump (not yet done).
-- **`npm run lint` — 9 errors, all pre-existing.** 4 in our code:
-  `set-state-in-effect` in `hooks/useDashboards|useDataSources|useWidgets`
-  (the load-from-localStorage-on-mount pattern — goes away with the SQLite
-  migration) and `ChatPanel.tsx:53`. The other 5 are in vendored
-  `components/ui/` (carousel, chart×2, sidebar, use-mobile) — clear by
-  regenerating those from shadcn.
+- **`npm install` works with no flags.** 3 `npm audit` warnings remain, all
+  cleared by a `next` 16.2.1 → 16.3.x bump (not yet done).
+- **`npm run lint` — 8 errors, all pre-existing.** 3 in our code:
+  `set-state-in-effect` in `hooks/useDashboards|useWidgets` (the
+  load-from-localStorage-on-mount pattern — goes with the next migration) and
+  `ChatPanel.tsx`. The other 5 are in vendored `components/ui/` (carousel,
+  chart×2, sidebar, use-mobile) — clear by regenerating those from shadcn.
+- Setup now needs `.env` (copy `.env.example`, generate
+  `DATA_SOURCE_ENCRYPTION_KEY`) and `npm run db:migrate`.
 - **No tests, no typecheck script.**
 - **Demo needs BYO credentials** — the only data source type is Snow Leopard,
   which needs an API key + uploaded datafile. Nothing works out of the box.
@@ -60,21 +62,20 @@ data — it's a general-purpose dashboard builder.
 
 ### Persistence → local SQLite
 
-Replace localStorage with a local SQLite database.
+Replace localStorage with a local SQLite database, via **Prisma 6** (`prisma-client-js`
+generator, `@prisma/client` import — Prisma 7 was tried and reverted: its config
+split and "agent skills" scaffolding add friction with no payoff here).
 
-- Tables: `dashboards`, `widgets` (layout fields inline), `data_sources`.
-- Accessed only from route handlers / server actions, never the client.
-- ORM: use **Prisma**. (An ORM lets you define your tables once as a schema and
-  then read/write rows as typed objects instead of hand-writing SQL strings.)
-  Prisma has the gentlest learning curve, generates database migrations for you,
-  and ships a GUI (Prisma Studio) for inspecting the local DB — and it's the one
-  a reviewer is most likely to recognize. Drizzle is a lighter, more
-  SQL-flavored alternative; not worth the extra friction here.
-- Migration path: keep the `useDashboards` / `useWidgets` / `useDataSources`
-  hook signatures identical; swap their internals from `lib/store.ts` to `fetch`
-  calls against new `/api/**` routes. Components shouldn't change.
-- Provide a one-time "import from browser storage" so existing local data isn't
-  lost.
+- Tables: `DataSource` (**done**), then `Dashboard`, `Widget` (layout inline).
+- Accessed only from route handlers, never the client (`lib/db.ts` is
+  `server-only`).
+- Secrets (API keys) encrypted at rest with AES-256-GCM (`lib/crypto.ts`).
+- Migration path (proven on `DataSource`): keep the hook's return shape; swap its
+  internals from `lib/store.ts` to `fetch` against new `/api/**` routes.
+  `useDataSources` did change `add`/`remove` to async — the dashboard/widget
+  hooks will too.
+- **Still to do:** `Dashboard` + `Widget` tables and a one-time
+  import from `localStorage` so existing local data isn't lost.
 
 ### Retrieval → pluggable engine
 
@@ -86,12 +87,15 @@ Snow Leopard is the current engine, not a commitment.
   against a SQLite/Postgres source, no NL step), possibly a local-LLM engine.
 - `widget-detector.ts` already takes plain rows — keep it that way; it never
   learns which engine produced them.
-- `app/api/ai/retrieve` and `app/api/data-sources/verify` become thin adapters
-  over the engine.
+- `app/api/ai/retrieve` becomes a thin adapter over the engine (verification is
+  already folded into `POST /api/data-sources`).
 
 ### Data sources → typed connections
 
-A data source is `{ id, name, type, config }`:
+A data source is `{ id, name, type, config }`. The `DataSource` model already has
+a `type` column (defaults to `snowleopard`); today `datafileId` + encrypted
+`apiKeyCipher` are explicit columns. When a second type lands, move the
+type-specific fields into a JSON `config` column.
 
 - `snowleopard` — `{ apiKey, datafileId }` (today)
 - `sqlite` — `{ path }` (natural for a local app; the Snow Leopard sample
@@ -101,14 +105,14 @@ A data source is `{ id, name, type, config }`:
 
 MVP ships `snowleopard` plus one bundled sample so the app works with no signup.
 
-### Secrets
+### Secrets — done
 
-- Move API keys out of localStorage and out of client → server request bodies.
-- Single-tenant: keys live in the `data_sources` row (local DB) and/or
-  `.env.local`, read server-side only.
+- API keys are stored encrypted (AES-256-GCM, `lib/crypto.ts`) in the local DB,
+  keyed by `DATA_SOURCE_ENCRYPTION_KEY` from `.env`.
 - The client calls `/api/ai/retrieve` with a `dataSourceId`; the route looks up
-  the key. **This is the first real work item** — the current flow sends the key
-  from the browser on every call.
+  the row and decrypts server-side. No `apiKey` in any client payload or in the
+  client-facing `DataSource` type.
+- Future option if it matters: per-source key derivation, or a `.env`-only mode.
 
 ### Packaging (deferred)
 
@@ -138,13 +142,10 @@ hard-code it.
 
 1. ~~**Warm-up:** clean the dead deps.~~ Done (commit `2321de8`). Still open:
    bump `next` 16.2.1 → 16.3.x to clear the 3 audit warnings.
-2. **Prisma + SQLite, `data_sources` first.** Smallest entity, and it's the one
-   entangled with the secrets fix. Add Prisma, model `DataSource`, add
-   `/api/data-sources` route handlers, swap `useDataSources` internals from
-   localStorage to `fetch`. Then make `/api/ai/retrieve` and `/verify` take a
-   `dataSourceId` and look the key up server-side; remove `apiKey` from client
-   types and payloads. This lands the security fix and proves the pattern.
-3. **`dashboards` + `widgets` to Prisma** using the same recipe; add the
+2. ~~**Prisma + SQLite, `data_sources` first** + secrets fix.~~ Done
+   (`feat/prisma-data-sources`). Data sources persist in SQLite; keys encrypted
+   at rest; `/api/ai/retrieve` + `/chat` take a `dataSourceId`.
+3. **`Dashboard` + `Widget` to Prisma** using the same recipe; add the
    one-time localStorage import.
 4. **`QueryEngine` abstraction** + bundled sample SQLite data source so the
    app works with no signup.
@@ -153,8 +154,9 @@ hard-code it.
 
 ## "v1 done" checklist
 
-- [ ] SQLite persistence; localStorage removed (with one-time import)
-- [ ] Secrets server-side only
+- [x] Secrets server-side only (encrypted at rest)
+- [~] SQLite persistence — data sources done; dashboards + widgets + localStorage
+      import still to do
 - [ ] `QueryEngine` abstraction; Snow Leopard behind it
 - [ ] One bundled zero-setup data source (sample SQLite), with matching
       example prompts in `ChatPanel`
@@ -175,8 +177,10 @@ hard-code it.
   toggles and the refresh-interval selector are non-functional local state.
 - `app/dashboard/[id]/page.tsx` — "Last updated" renders `new Date()` every
   render, not a stored timestamp.
-- `app/api/ai/chat/route.ts` — a streaming chat route exists but the UI uses
-  `/retrieve`; decide whether streaming chat stays.
+- `app/api/ai/chat/route.ts` — streaming chat route, kept in sync with the new
+  `dataSourceId` signature but still unused by the UI; decide whether it stays.
 - No error boundary or offline handling around retrieval.
 - `Dashboard.widgetCount` in `lib/types.ts` is stored but never kept in sync
   with actual widgets.
+- An upstream SnowLeopard auth failure on `/api/ai/retrieve` surfaces as a bare
+  `HTTP Error: 401` with a 500 status — could map to a friendlier 422.

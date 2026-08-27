@@ -19,26 +19,35 @@ Primary goal right now: a clean, working portfolio piece.
 - recharts (charts), react-grid-layout (dashboard grid), sonner (toasts)
 - Data/AI layer: Snow Leopard (`@snowleopard-ai/client`), treated as a
   swappable engine — see VISION
-- Persistence today: browser localStorage. Target: local SQLite (in progress)
+- Persistence: **data sources** → local SQLite via Prisma 6.
+  **dashboards + widgets** → still browser localStorage (next milestone).
 
 ## Layout
 
 - `app/` — routes. `app/api/**` route handlers are the only server code.
 - `components/` — feature components; `components/ui/` is generated shadcn.
-- `hooks/` — `useDashboards`, `useWidgets`, `useDataSources` wrap persistence;
-  `useSnowLeopard` wraps retrieval. Components go through these and never touch
-  storage or `fetch` for data directly.
-- `lib/` — `store.ts` (localStorage helpers), `widget-detector.ts` (pure:
-  rows → widget spec), `types.ts`, `snowleopard.ts` (server-only client factory).
+- `hooks/` — `useDashboards`, `useWidgets` (localStorage), `useDataSources`
+  (fetches `/api/data-sources`); `useSnowLeopard` wraps retrieval. Components go
+  through these and never touch storage or `fetch` for data directly.
+- `lib/` — `db.ts` (Prisma singleton, server-only), `crypto.ts` (AES-256-GCM
+  for secrets at rest, server-only), `store.ts` (localStorage helpers),
+  `widget-detector.ts` (pure: rows → widget spec), `types.ts`,
+  `snowleopard.ts` (server-only client factory + `verifyConnection`).
+- `prisma/` — `schema.prisma` and committed `migrations/`. The `dev.db` file is
+  local and gitignored.
 - `pydantic-ai/` — standalone Python example, not part of the web app.
 
 ## Commands
 
-- `npm run dev` — dev server
+- `npm run dev` — dev server (port 3000 is often taken on this machine; it will
+  fall back to 3001, or use `PORT=3100 npm run dev`)
 - `npm run build` — production build; run this before claiming a change compiles
 - `npm run lint` — eslint
+- `npm run db:migrate` — create/apply a Prisma migration after editing the schema
+- `npm run db:studio` — browse the local DB
 
-No test or typecheck script yet (see VISION). When you add one, wire it here.
+Requires `.env` (copy `.env.example`) with `DATABASE_URL` and a generated
+`DATA_SOURCE_ENCRYPTION_KEY`. No test or typecheck script yet (see VISION).
 
 ## Conventions
 
@@ -50,8 +59,9 @@ No test or typecheck script yet (see VISION). When you add one, wire it here.
 - Keep `widget-detector.ts` pure and engine-agnostic: plain rows in, widget
   spec out. New data engines adapt their output to that shape.
 - `components/ui/` is vendored shadcn — regenerate, don't edit.
-- Secrets never reach the client. Route handlers hold API keys; the client
-  sends a data-source id, not a key. (Not true yet — first work item in VISION.)
+- Secrets never reach the client. API keys are encrypted at rest in the DB
+  (`lib/crypto.ts`); route handlers decrypt them; the client sends a
+  `dataSourceId`, never a key. Keep it that way for any new data engine.
 - Don't build fake UI. If a feature isn't wired, don't ship a control for it
   (the alert toggles and refresh-interval in `DashboardSettings` are existing
   examples to fix or cut).
