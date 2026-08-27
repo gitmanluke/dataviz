@@ -151,38 +151,32 @@ hard-code it.
 3. ~~**`Dashboard` + `Widget` to Prisma**~~ Done
    (`feat/prisma-dashboards-widgets`). Includes the one-time localStorage import
    and deletes `lib/store.ts`.
-4. **`QueryEngine` abstraction** + bundled sample SQLite data source so the
-   app works with no signup — **and the widget-system rework** (see below).
+4. Widget-system rework — **done** (`feat/widget-system`, see below). Still to
+   do in this milestone: the **`QueryEngine` abstraction** + a bundled sample
+   SQLite data source so the app works with no signup.
 5. **Cleanup pass:** remove fake UI, add `typecheck`/`test` scripts + Vitest +
    CI, write the README.
 
-### Widget system rework (part of milestone 4)
+### Widget system rework — done (`feat/widget-system`)
 
-Real data exposed that `lib/widget-detector.ts` and `WidgetCard` don't share a
-data contract. Concrete failure: "top 5 superheroes by appearances" returned
-`{ id, name, appearance_count }`; the detector's "1 string + multiple numerics"
-rule fired (because `id` counts as numeric) and emitted `{ name, id,
-appearance_count }`, but `WidgetCard`'s bar renderer is hardcoded to
-`<Bar dataKey="value">` and `height={200}`, so it drew axes and no bars.
+All five points landed as one commit each, plus a menu fix:
 
-Needs:
-- Detector: drop `id` / `*_id` / key-like columns from metric detection (keep
-  them for the table view); pick the value column deliberately; revisit
-  pie-vs-bar (ranking queries should stay bars even at ≤8 rows).
-- One normalized shape for every chart type, or an explicit `{ nameKey,
-  valueKeys[] }` in the detector output; renderer supports multi-series bars.
-- Per-type default widget sizes (`hooks/useWidgets.ts` hardcodes `w:4 h:3`);
-  charts fill the widget height instead of a fixed 200px; rotate/truncate long
-  axis labels.
-- **Intent-driven chart type:** parse the query for "pie / bar / line / table /
-  number / metric" and use that type when the data supports it, instead of the
-  shape heuristic. Today the query text only sets the widget title —
-  "pie chart of X" and "bar chart of X" produce identical widgets.
-- **Conversational follow-up:** `ChatPanel` has no memory — each prompt is
-  independent, so "make that a pie chart instead" isn't understood. Keep the
-  last produced widget in `ChatPanel` state; if the next message is a pure
-  presentation change and the data is compatible, re-render that data as the
-  new type with no SnowLeopard call. Anything else → normal retrieval.
+1. `widget-detector` ignores `id`/key/date columns when picking a measure; pie
+   only on a "breakdown/share/percentage" query with ≤8 slices.
+2. Shared `{ rows, xKey, series }` contract in `lib/widget-data.ts`
+   (`normalizeChartData` also repairs legacy widgets); `WidgetCard` renders one
+   bar/line per series with a legend.
+3. Per-type default sizes (`lib/dashboards.ts` `defaultSizeFor`); charts fill
+   the card via `ChartFrame`; truncated/angled labels, compact numbers.
+4. `parseChartIntent` — "pie chart of X" / "as a table" / "just the number"
+   override the shape heuristic when the data supports it.
+5. `ChatPanel` keeps the last widget; a refinement message ("make that a pie
+   chart") re-renders it via `retypeWidget` with no SnowLeopard call.
+6. Fixed the widget options menu (was clipped by the card's `overflow-hidden`
+   — now the Radix `DropdownMenu`).
+
+Still open in milestone 4: the `QueryEngine` abstraction and the bundled
+zero-setup sample data source.
 
 ## "v1 done" checklist
 
@@ -192,8 +186,9 @@ Needs:
 - [ ] `QueryEngine` abstraction; Snow Leopard behind it
 - [ ] One bundled zero-setup data source (sample SQLite), with matching
       example prompts in `ChatPanel`
-- [ ] NL-query → widget flow solid across all five widget types on the sample
-      (blocked by the widget-system rework — see milestone 4)
+- [~] NL-query → widget flow: detector/renderer rework done
+      (`feat/widget-system`); still want the bundled sample to exercise it end
+      to end
 - [ ] Remove dead/fake UI (alert toggles, non-functional refresh interval)
 - [ ] `npm run typecheck` + `npm run test` scripts; Vitest on `widget-detector`
       and route handlers; CI running lint + typecheck + test + build
