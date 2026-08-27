@@ -6,7 +6,7 @@ import { WidgetCard } from "./WidgetCard"
 import dynamic from "next/dynamic"
 import type { Layout } from "react-grid-layout"
 import { toast } from "sonner"
-import type { Widget, LayoutItem } from "@/lib/types"
+import type { Widget, LayoutItem, WidgetSpec } from "@/lib/types"
 import "react-grid-layout/css/styles.css"
 
 const GridLayout = dynamic(() => import("react-grid-layout"), { ssr: false })
@@ -20,6 +20,7 @@ interface DashboardGridProps {
   onRemove: (id: string) => void
   onDuplicate: (id: string) => void
   onRename: (id: string, title: string) => void
+  onUpdateSpec: (id: string, spec: WidgetSpec) => void
   onLayoutChange: (newLayouts: LayoutItem[]) => void
 }
 
@@ -30,6 +31,7 @@ export function DashboardGrid({
   onRemove,
   onDuplicate,
   onRename,
+  onUpdateSpec,
   onLayoutChange,
 }: DashboardGridProps) {
   const [gridWidth, setGridWidth] = useState(1200)
@@ -88,6 +90,7 @@ export function DashboardGrid({
               onDelete={() => { onRemove(widget.id); toast.success("Widget removed") }}
               onDuplicate={() => { onDuplicate(widget.id); toast.success("Widget duplicated") }}
               onRename={(title) => onRename(widget.id, title)}
+              onUpdateSpec={(spec) => onUpdateSpec(widget.id, spec)}
             />
           </div>
         ))}

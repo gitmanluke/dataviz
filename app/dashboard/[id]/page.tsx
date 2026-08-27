@@ -20,7 +20,7 @@ export default function DashboardPage() {
   const [showSettings, setShowSettings] = useState(false)
   const [showChat, setShowChat] = useState(false)
 
-  const { widgets, layouts, initialized: widgetsInitialized, add, remove, duplicate, updateLayouts, rename } = useWidgets(dashboardId)
+  const { widgets, layouts, initialized: widgetsInitialized, add, remove, duplicate, updateLayouts, rename, updateSpec } = useWidgets(dashboardId)
   const { dashboards, initialized: dashboardsInitialized, create, update, remove: removeDashboard, updateLastViewed } = useDashboards()
 
   const hasCreated = useRef(false)
@@ -122,6 +122,7 @@ export default function DashboardPage() {
               onRemove={remove}
               onDuplicate={duplicate}
               onRename={rename}
+              onUpdateSpec={updateSpec}
               onLayoutChange={updateLayouts}
             />
           </div>

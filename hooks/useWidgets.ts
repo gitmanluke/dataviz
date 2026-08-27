@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { Widget, LayoutItem, DashboardStore } from "@/lib/types"
+import type { Widget, LayoutItem, DashboardStore, WidgetSpec } from "@/lib/types"
 
 const EMPTY: DashboardStore = { widgets: [], layouts: [] }
 
@@ -97,6 +97,20 @@ export function useWidgets(dashboardId: string) {
     }).catch(() => {})
   }, [])
 
+  const updateSpec = useCallback((id: string, spec: WidgetSpec) => {
+    setStore(prev => ({
+      ...prev,
+      widgets: prev.widgets.map(w =>
+        w.id === id ? { ...w, spec, type: spec.type, title: spec.title } : w
+      ),
+    }))
+    void fetch(`/api/widgets/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ spec }),
+    }).catch(() => {})
+  }, [])
+
   useEffect(() => {
     return () => {
       if (layoutTimer.current) clearTimeout(layoutTimer.current)
@@ -112,5 +126,6 @@ export function useWidgets(dashboardId: string) {
     duplicate,
     updateLayouts,
     rename,
+    updateSpec,
   }
 }

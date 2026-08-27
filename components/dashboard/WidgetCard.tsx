@@ -1,6 +1,6 @@
 "use client"
 
-import { MoreVertical, Copy, Trash2, GripVertical, Pencil } from "lucide-react"
+import { MoreVertical, Copy, Trash2, GripVertical, Pencil, SlidersHorizontal } from "lucide-react"
 import { useState, useRef } from "react"
 import {
   DropdownMenu,
@@ -11,13 +11,15 @@ import {
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { normalizeChartData, seriesLabel, compactNumber, truncateLabel } from "@/lib/widget-data"
 import { applySpec, type ChartView } from "@/lib/widget-spec"
-import type { Widget } from "@/lib/types"
+import { WidgetEditPanel } from "./WidgetEditPanel"
+import type { Widget, WidgetSpec } from "@/lib/types"
 
 interface WidgetCardProps {
   widget: Pick<Widget, "id" | "type" | "title" | "data" | "spec">
   onDelete: () => void
   onDuplicate: () => void
   onRename: (title: string) => void
+  onUpdateSpec: (spec: WidgetSpec) => void
 }
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4']
@@ -46,9 +48,10 @@ function ChartFrame({ children }: { children: React.ReactElement }) {
   )
 }
 
-export function WidgetCard({ widget, onDelete, onDuplicate, onRename }: WidgetCardProps) {
+export function WidgetCard({ widget, onDelete, onDuplicate, onRename, onUpdateSpec }: WidgetCardProps) {
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(widget.title)
+  const [editOpen, setEditOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const startRename = () => {
@@ -250,6 +253,10 @@ export function WidgetCard({ widget, onDelete, onDuplicate, onRename }: WidgetCa
               <MoreVertical className="w-4 h-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onMouseDown={e => e.stopPropagation()}>
+              <DropdownMenuItem onSelect={() => setEditOpen(true)}>
+                <SlidersHorizontal className="w-4 h-4 mr-2" />
+                Edit
+              </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => startRename()}>
                 <Pencil className="w-4 h-4 mr-2" />
                 Rename
@@ -272,6 +279,13 @@ export function WidgetCard({ widget, onDelete, onDuplicate, onRename }: WidgetCa
       <div className="flex-1 min-h-0 p-3">
         {renderContent()}
       </div>
+
+      <WidgetEditPanel
+        widget={widget}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onChange={onUpdateSpec}
+      />
     </div>
   )
 }
