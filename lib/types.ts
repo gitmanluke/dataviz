@@ -9,11 +9,22 @@ export interface Dashboard {
 
 export type WidgetType = "line-chart" | "bar-chart" | "pie-chart" | "stat" | "table"
 
+// How to render a widget's raw rows. Produced by the viz agent (or the
+// heuristic fallback), editable in the widget edit panel.
+export interface WidgetSpec {
+  type: WidgetType
+  title: string
+  xKey: string        // category/time-axis column ("" for stat)
+  series: string[]    // measure columns to plot
+  sort?: "none" | "asc" | "desc"
+}
+
 export interface Widget {
   id: string
   type: WidgetType
   title: string
-  data: unknown
+  data: unknown        // raw query rows (Record<string, unknown>[]); legacy widgets store collapsed chart data
+  spec?: WidgetSpec
 }
 
 export interface LayoutItem {

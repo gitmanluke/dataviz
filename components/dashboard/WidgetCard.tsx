@@ -1,6 +1,6 @@
 "use client"
 
-import { MoreVertical, Copy, Trash2, TrendingUp, TrendingDown, GripVertical, Pencil } from "lucide-react"
+import { MoreVertical, Copy, Trash2, GripVertical, Pencil } from "lucide-react"
 import { useState, useRef } from "react"
 import {
   DropdownMenu,
@@ -10,14 +10,11 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { normalizeChartData, seriesLabel, compactNumber, truncateLabel } from "@/lib/widget-data"
+import { applySpec, type ChartView } from "@/lib/widget-spec"
+import type { Widget } from "@/lib/types"
 
 interface WidgetCardProps {
-  widget: {
-    id: string
-    type: string
-    title: string
-    data: unknown
-  }
+  widget: Pick<Widget, "id" | "type" | "title" | "data" | "spec">
   onDelete: () => void
   onDuplicate: () => void
   onRename: (title: string) => void
@@ -66,10 +63,14 @@ export function WidgetCard({ widget, onDelete, onDuplicate, onRename }: WidgetCa
     setIsRenaming(false)
   }
 
+  const view: ChartView = widget.spec
+    ? applySpec(widget.data, widget.spec)
+    : normalizeChartData(widget.data)
+
   const renderContent = () => {
     switch (widget.type) {
       case "line-chart": {
-        const { rows, xKey, series } = normalizeChartData(widget.data)
+        const { rows, xKey, series } = view
         return (
           <ChartFrame>
             <LineChart data={rows} margin={{ top: 4, right: 12, bottom: 4, left: 0 }}>
@@ -101,7 +102,7 @@ export function WidgetCard({ widget, onDelete, onDuplicate, onRename }: WidgetCa
       }
 
       case "bar-chart": {
-        const { rows, xKey, series } = normalizeChartData(widget.data)
+        const { rows, xKey, series } = view
         return (
           <ChartFrame>
             <BarChart data={rows} margin={{ top: 4, right: 12, bottom: 4, left: 0 }}>
@@ -128,7 +129,7 @@ export function WidgetCard({ widget, onDelete, onDuplicate, onRename }: WidgetCa
       }
 
       case "pie-chart": {
-        const { rows, xKey, series } = normalizeChartData(widget.data)
+        const { rows, xKey, series } = view
         const valueKey = series[0] ?? "value"
         return (
           <ChartFrame>
@@ -155,30 +156,28 @@ export function WidgetCard({ widget, onDelete, onDuplicate, onRename }: WidgetCa
       }
 
       case "stat": {
-        const statData = widget.data as { value: number; change: number; trend: string }
+        const key = view.series[0]
+        const raw = widget.spec
+          ? view.rows[0]?.[key]
+          : (widget.data as { value?: unknown } | null)?.value
+        const num = Number(raw)
+        const display = Number.isFinite(num)
+          ? num > 9999
+            ? num.toLocaleString()
+            : String(num)
+          : String(raw ?? "—")
         return (
           <div className="h-full flex flex-col justify-center">
-            <div className="text-4xl font-bold text-gray-900 mb-2 tabular-nums">
-              {typeof statData.value === 'number' && statData.value > 1000
-                ? statData.value.toLocaleString()
-                : statData.value}
-            </div>
-            <div className={`inline-flex items-center text-sm ${
-              statData.trend === 'up' ? 'text-green-600' : 'text-red-600'
-            }`}>
-              {statData.trend === 'up' ? (
-                <TrendingUp className="w-4 h-4 mr-1" />
-              ) : (
-                <TrendingDown className="w-4 h-4 mr-1" />
-              )}
-              {Math.abs(statData.change)}% vs last period
-            </div>
+            <div className="text-4xl font-bold text-gray-900 tabular-nums">{display}</div>
+            {widget.spec && key && (
+              <div className="text-sm text-gray-500 mt-1">{seriesLabel(key)}</div>
+            )}
           </div>
         )
       }
 
       case "table": {
-        const tableData = widget.data as Array<Record<string, unknown>>
+        const tableData = view.rows
         return (
           <div className="h-full overflow-auto">
             <table className="w-full text-sm">

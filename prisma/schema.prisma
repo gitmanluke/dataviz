@@ -37,7 +37,8 @@ model Widget {
   dashboard   Dashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
   type        String
   title       String
-  data        String    @default("null") // JSON-serialized widget payload
+  data        String    @default("null") // JSON-serialized raw query rows
+  spec        String? // JSON-serialized WidgetSpec (how to render `data`)
   // react-grid-layout position/size
   x           Int       @default(0)
   y           Int       @default(0)

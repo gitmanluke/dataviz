@@ -3,7 +3,8 @@ import type { SchemaData, RetrieveResponse } from "@snowleopard-ai/client"
 import { prisma } from "@/lib/db"
 import { decryptSecret } from "@/lib/crypto"
 import { createSnowLeopardClient } from "@/lib/snowleopard"
-import { detectWidget } from "@/lib/widget-detector"
+import { detectSpec } from "@/lib/widget-detector"
+import { STORE_ROW_CAP } from "@/lib/widget-spec"
 
 interface RetrieveRequest {
   userQuery: string
@@ -27,8 +28,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Data source not found" }, { status: 404 })
     }
 
-    const apiKey = decryptSecret(source.apiKeyCipher)
-    const client = createSnowLeopardClient(apiKey)
+    const client = createSnowLeopardClient(decryptSecret(source.apiKeyCipher))
 
     try {
       const result = await client.retrieve({
@@ -44,7 +44,6 @@ export async function POST(request: NextRequest) {
       }
 
       const retrieveResult = result as RetrieveResponse
-
       if (retrieveResult.responseStatus !== "SUCCESS") {
         return NextResponse.json(
           { error: `Query failed: ${retrieveResult.responseStatus}` },
@@ -55,7 +54,6 @@ export async function POST(request: NextRequest) {
       const schemaEntry = retrieveResult.data.find(
         (d): d is SchemaData => d.__type__ === "schemaData"
       )
-
       if (!schemaEntry) {
         const errEntry = retrieveResult.data[0]
         const errMsg =
@@ -65,13 +63,21 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: errMsg }, { status: 422 })
       }
 
-      const rawData = schemaEntry.rows
+      const allRows = Array.isArray(schemaEntry.rows) ? schemaEntry.rows : []
+      const rows = allRows.slice(0, STORE_ROW_CAP)
       const sql = schemaEntry.query ?? undefined
-      const explanation =
-        schemaEntry.querySummary?.non_technical_explanation ?? null
+      const explanation = schemaEntry.querySummary?.non_technical_explanation ?? null
 
-      const detected = detectWidget(rawData, userQuery, sql)
-      return NextResponse.json({ ...detected, explanation })
+      const spec = detectSpec(rows, userQuery)
+
+      return NextResponse.json({
+        spec,
+        rows,
+        sql,
+        explanation,
+        truncated: allRows.length > rows.length,
+        usedAgent: false,
+      })
     } finally {
       await client.close()
     }

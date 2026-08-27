@@ -56,6 +56,7 @@ export async function POST(
       type: body.type,
       title: body.title,
       data: JSON.stringify(body.data ?? null),
+      spec: body.spec ? JSON.stringify(body.spec) : null,
       x: 0,
       y: nextY,
       ...size,

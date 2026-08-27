@@ -69,6 +69,7 @@ export function useWidgets(dashboardId: string) {
       type: original.type,
       title: `${original.title} (Copy)`,
       data: original.data,
+      spec: original.spec,
     })
   }, [store.widgets, add])
 

@@ -2,7 +2,7 @@
 // and WidgetCard. Charts store their data as { rows, xKey, series } so the
 // renderer never has to guess which column is the axis and which are values.
 
-import type { WidgetType } from "@/lib/types"
+import type { WidgetType, WidgetSpec } from "@/lib/types"
 
 export interface ChartData {
   rows: Array<Record<string, unknown>>
@@ -64,7 +64,7 @@ function xExists(row: Record<string, unknown>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(row, key)
 }
 
-function inferXKey(rows: Array<Record<string, unknown>>): string {
+export function inferXKey(rows: Array<Record<string, unknown>>): string {
   if (rows.length === 0) return "name"
   const keys = Object.keys(rows[0])
   if (keys.includes("name")) return "name"
@@ -72,7 +72,7 @@ function inferXKey(rows: Array<Record<string, unknown>>): string {
   return keys.find(k => !looksNumeric(rows[0][k])) ?? keys[0] ?? "name"
 }
 
-function inferSeries(rows: Array<Record<string, unknown>>, xKey: string): string[] {
+export function inferSeries(rows: Array<Record<string, unknown>>, xKey: string): string[] {
   if (rows.length === 0) return ["value"]
   const numeric = Object.keys(rows[0]).filter(
     k => k !== xKey && !ID_KEY.test(k) && looksNumeric(rows[0][k])
@@ -136,49 +136,14 @@ export function isRefinement(query: string): boolean {
 
 // --- Retyping an existing widget -------------------------------------------
 
-function toChartData(data: unknown, from: WidgetType): ChartData | null {
-  if (from === "stat") {
-    const v = (data as { value?: unknown })?.value
-    if (v == null || !isFinite(Number(v))) return null
-    return { rows: [{ name: "Value", value: Number(v) }], xKey: "name", series: ["value"] }
-  }
-  if (!Array.isArray(data) && from === "table") return null
-  const c = normalizeChartData(data)
-  return c.rows.length > 0 ? c : null
-}
-
 /**
- * Convert an existing widget's stored data to a different widget type without
- * re-querying. Returns null when the conversion doesn't make sense (e.g. a stat
- * from an empty chart).
+ * Change a widget's type without re-querying — the raw rows are unchanged, only
+ * the spec. Pie and stat collapse to a single series.
  */
-export function retypeWidget(
-  data: unknown,
-  from: WidgetType,
-  target: WidgetType
-): { type: WidgetType; data: unknown } | null {
-  if (from === target) return { type: target, data }
-
-  if (isChartType(target)) {
-    const chart = toChartData(data, from)
-    return chart ? { type: target, data: chart } : null
+export function retypeSpec(spec: WidgetSpec, target: WidgetType): WidgetSpec {
+  if (spec.type === target) return spec
+  if (target === "pie-chart" || target === "stat") {
+    return { ...spec, type: target, series: spec.series.slice(0, 1) }
   }
-
-  if (target === "table") {
-    if (Array.isArray(data) && data.length > 0) return { type: "table", data }
-    const chart = toChartData(data, from)
-    return chart ? { type: "table", data: chart.rows } : null
-  }
-
-  if (target === "stat") {
-    const chart = toChartData(data, from)
-    const first = chart?.rows[0]
-    const key = chart?.series[0] ?? "value"
-    const value = first ? Number(first[key]) : NaN
-    return isFinite(value)
-      ? { type: "stat", data: { value, change: 0, trend: "up" as const } }
-      : null
-  }
-
-  return null
+  return { ...spec, type: target }
 }

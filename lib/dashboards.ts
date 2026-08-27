@@ -1,6 +1,6 @@
 import "server-only"
 import type { Widget as WidgetRow } from "@prisma/client"
-import type { Dashboard, Widget, LayoutItem, WidgetType } from "@/lib/types"
+import type { Dashboard, Widget, LayoutItem, WidgetType, WidgetSpec } from "@/lib/types"
 
 type DashboardRow = {
   id: string
@@ -31,6 +31,7 @@ export function widgetToClient(row: WidgetRow): { widget: Widget; layout: Layout
       type: row.type as WidgetType,
       title: row.title,
       data: safeParse(row.data),
+      ...(row.spec ? { spec: safeParse(row.spec) as WidgetSpec } : {}),
     },
     layout: {
       i: row.id,

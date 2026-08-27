@@ -4,8 +4,8 @@ import { useState, useRef, useEffect } from "react"
 import { Sparkles, X, Send, Loader2, BarChart3, LineChart, PieChart, Hash, Table } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useDataSources } from "@/hooks/useDataSources"
-import { useSnowLeopard, type DetectedWidget } from "@/hooks/useSnowLeopard"
-import { parseChartIntent, isRefinement, retypeWidget } from "@/lib/widget-data"
+import { useSnowLeopard, type WidgetResult } from "@/hooks/useSnowLeopard"
+import { parseChartIntent, isRefinement, retypeSpec } from "@/lib/widget-data"
 import type { DataSource, Widget } from "@/lib/types"
 
 interface Message {
@@ -13,7 +13,7 @@ interface Message {
   text: string
   sender: "user" | "ai"
   timestamp: Date
-  detectedWidget?: DetectedWidget
+  widget?: WidgetResult
   isLoading?: boolean
 }
 
@@ -40,7 +40,7 @@ export function ChatPanel({ onClose, onAddWidget }: ChatPanelProps) {
     timestamp: new Date(),
   }])
   const [input, setInput] = useState("")
-  const [lastWidget, setLastWidget] = useState<DetectedWidget | null>(null)
+  const [lastResult, setLastResult] = useState<WidgetResult | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const { isLoading, retrieve } = useSnowLeopard({
@@ -73,30 +73,24 @@ export function ChatPanel({ onClose, onAddWidget }: ChatPanelProps) {
       { id: aiMsgId, text: "", sender: "ai", timestamp: new Date(), isLoading: true },
     ])
 
-    // Follow-up like "make that a pie chart" — re-render the last widget's data
-    // as a new type without another query.
+    // Follow-up like "make that a pie chart" — re-render the last result's rows
+    // under a new spec without another query.
     const intent = parseChartIntent(query)
-    if (intent && lastWidget && isRefinement(query)) {
-      const retyped = retypeWidget(lastWidget.data, lastWidget.widgetType, intent)
-      if (retyped) {
-        const newWidget: DetectedWidget = {
-          ...lastWidget,
-          widgetType: retyped.type,
-          data: retyped.data,
-        }
-        setLastWidget(newWidget)
-        setMessages(prev => prev.map(m =>
-          m.id === aiMsgId
-            ? {
-                ...m,
-                isLoading: false,
-                text: `Here's the same data as a ${retyped.type.replace("-", " ")}.`,
-                detectedWidget: newWidget,
-              }
-            : m
-        ))
-        return
-      }
+    if (intent && lastResult && isRefinement(query)) {
+      const newSpec = retypeSpec(lastResult.spec, intent)
+      const updated: WidgetResult = { ...lastResult, spec: newSpec }
+      setLastResult(updated)
+      setMessages(prev => prev.map(m =>
+        m.id === aiMsgId
+          ? {
+              ...m,
+              isLoading: false,
+              text: `Here's the same data as a ${newSpec.type.replace("-", " ")}.`,
+              widget: updated,
+            }
+          : m
+      ))
+      return
     }
 
     if (!selectedSource) {
@@ -109,7 +103,7 @@ export function ChatPanel({ onClose, onAddWidget }: ChatPanelProps) {
     }
 
     try {
-      const result = await retrieve(query)
+      const result = await retrieve(query, lastResult?.spec)
 
       if (!result) {
         setMessages(prev => prev.map(m =>
@@ -120,13 +114,14 @@ export function ChatPanel({ onClose, onAddWidget }: ChatPanelProps) {
         return
       }
 
-      // Use the natural language explanation as dialogue; attach widget if data was found
-      const dialogueText = result.explanation ?? `Here's what I found: a ${result.widgetType.replace("-", " ")} based on your query.`
+      const dialogueText =
+        result.explanation ??
+        `Here's what I found: a ${result.spec.type.replace("-", " ")} based on your query.`
 
-      setLastWidget(result)
+      setLastResult(result)
       setMessages(prev => prev.map(m =>
         m.id === aiMsgId
-          ? { ...m, text: dialogueText, isLoading: false, detectedWidget: result }
+          ? { ...m, text: dialogueText, isLoading: false, widget: result }
           : m
       ))
     } catch (err) {
@@ -192,35 +187,36 @@ export function ChatPanel({ onClose, onAddWidget }: ChatPanelProps) {
                   <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
 
                   {/* Widget preview card */}
-                  {msg.detectedWidget && (
+                  {msg.widget && (
                     <div className="mt-3 bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
                       <div className="flex items-center gap-2 mb-2">
                         {(() => {
-                          const Icon = WIDGET_ICONS[msg.detectedWidget.widgetType]
+                          const Icon = WIDGET_ICONS[msg.widget.spec.type]
                           return <Icon className="w-4 h-4 text-blue-600 shrink-0" />
                         })()}
                         <span className="text-xs font-semibold text-gray-800 flex-1 truncate">
-                          {msg.detectedWidget.title}
+                          {msg.widget.spec.title}
                         </span>
                         <span className="text-[10px] text-gray-400 capitalize shrink-0">
-                          {msg.detectedWidget.widgetType.replace("-", " ")}
+                          {msg.widget.spec.type.replace("-", " ")}
                         </span>
                       </div>
-                      {msg.detectedWidget.sql && (
+                      {msg.widget.sql && (
                         <details className="mb-2">
                           <summary className="text-[10px] text-gray-400 cursor-pointer hover:text-gray-600 select-none">
                             View SQL
                           </summary>
                           <code className="text-[10px] text-gray-600 block mt-1 bg-gray-50 rounded p-1.5 overflow-x-auto whitespace-pre">
-                            {msg.detectedWidget.sql}
+                            {msg.widget.sql}
                           </code>
                         </details>
                       )}
                       <button
                         onClick={() => onAddWidget({
-                          type: msg.detectedWidget!.widgetType,
-                          title: msg.detectedWidget!.title,
-                          data: msg.detectedWidget!.data,
+                          type: msg.widget!.spec.type,
+                          title: msg.widget!.spec.title,
+                          data: msg.widget!.rows,
+                          spec: msg.widget!.spec,
                         })}
                         className="w-full text-xs bg-blue-600 text-white rounded-lg py-1.5 hover:bg-blue-700 transition-colors font-medium"
                       >
