@@ -25,14 +25,17 @@ The core loop already works:
 
 ## Where it stands (updated 2026-08-27)
 
-- **All app data persists in local SQLite via Prisma 6** — data sources
-  (`feat/prisma-data-sources`), plus dashboards + widgets
-  (`feat/prisma-dashboards-widgets`, stacked on it). `lib/store.ts` is gone.
-- **SnowLeopard API keys** are encrypted at rest (`lib/crypto.ts`) and never
-  leave the server; retrieval routes take a `dataSourceId`.
-- **One-time localStorage import** (`components/MigrationGate.tsx` +
-  `/api/migrate`) moves existing browser dashboards/widgets into the DB on
-  first load, then clears them. Idempotent.
+- **All app data persists in local SQLite via Prisma 6** — data sources,
+  dashboards, widgets, settings. `lib/store.ts` is gone. One-time localStorage
+  import via `MigrationGate` + `/api/migrate` (idempotent).
+- **Secrets** (SnowLeopard + Anthropic keys) are encrypted at rest
+  (`lib/crypto.ts`) and never leave the server.
+- **Widget system** (`feat/widget-system`): heuristic detector rebuilt around a
+  `{ rows, xKey, series }` contract; intent-driven type; chat follow-ups.
+- **Viz agent** (`feat/viz-agent`, current): widgets store raw rows + an
+  editable `WidgetSpec`; `QueryEngine` boundary over SnowLeopard; `ClaudeVizModel`
+  (Haiku) picks the spec when an Anthropic key is set, `detectSpec` heuristic
+  otherwise; `/settings` page for the key; per-widget edit panel.
 - **Builds clean.** `npm run build` passes (Next 16, Turbopack), TypeScript OK.
 - **`npm install` works with no flags.** 3 `npm audit` warnings remain, all
   cleared by a `next` 16.2.1 → 16.3.x bump (not yet done).
@@ -80,18 +83,23 @@ split and "agent skills" scaffolding add friction with no payoff here).
 - **Still to do:** `Dashboard` + `Widget` tables and a one-time
   import from `localStorage` so existing local data isn't lost.
 
-### Retrieval → pluggable engine
+### Retrieval → pluggable engine — done
 
-Snow Leopard is the current engine, not a commitment.
+- `QueryEngine.retrieve(query, source) → { rows, columns:[{name,type}], sql,
+  explanation, truncated }` (`lib/query-engine.ts`); `snowLeopardEngine` is the
+  only impl. Column types inferred from sample values.
+- `/api/ai/widget` is the adapter: engine → `resolveSpec` → `{ spec, rows }`.
+- Later: `SqlEngine` (direct SQL, no NL step) for a `sqlite`/`postgres` source.
 
-- Define `interface QueryEngine { retrieve(query, source): Promise<QueryResult> }`
-  with `QueryResult = { rows, columns, sql?, explanation? }`.
-- `SnowLeopardEngine` wraps today's client. Later: `SqlEngine` (direct SQL
-  against a SQLite/Postgres source, no NL step), possibly a local-LLM engine.
-- `widget-detector.ts` already takes plain rows — keep it that way; it never
-  learns which engine produced them.
-- `app/api/ai/retrieve` becomes a thin adapter over the engine (verification is
-  already folded into `POST /api/data-sources`).
+### Viz agent → pluggable model — done
+
+- `VizModel.proposeSpec(ctx) → WidgetSpec | null` (`lib/viz/model.ts`).
+- `ClaudeVizModel` (Haiku, one strict forced tool) when `getAnthropicKey()` has
+  a key; `detectSpec` heuristic otherwise and on any agent failure.
+- Later: `OllamaVizModel` for a no-API-key local option.
+- Phase 2 (not built): a `request_new_data` tool so "break it down by year" /
+  "only the top 3" re-query instead of the user rephrasing. Route loops
+  proposeSpec → request_new_data → engine.retrieve → proposeSpec (max 1).
 
 ### Data sources → typed connections
 
@@ -110,12 +118,12 @@ MVP ships `snowleopard` plus one bundled sample so the app works with no signup.
 
 ### Secrets — done
 
-- API keys are stored encrypted (AES-256-GCM, `lib/crypto.ts`) in the local DB,
-  keyed by `DATA_SOURCE_ENCRYPTION_KEY` from `.env`.
-- The client calls `/api/ai/retrieve` with a `dataSourceId`; the route looks up
-  the row and decrypts server-side. No `apiKey` in any client payload or in the
-  client-facing `DataSource` type.
-- Future option if it matters: per-source key derivation, or a `.env`-only mode.
+- All keys (per-source SnowLeopard, app-level Anthropic) stored encrypted
+  (AES-256-GCM, `lib/crypto.ts`) in the local DB, keyed by
+  `DATA_SOURCE_ENCRYPTION_KEY` from `.env`. `.env` `ANTHROPIC_API_KEY` is an
+  optional override.
+- The client sends a `dataSourceId` / `priorSpec`, never a key. Nothing secret
+  in a client payload or client-facing type.
 
 ### Packaging (deferred)
 
@@ -151,9 +159,9 @@ hard-code it.
 3. ~~**`Dashboard` + `Widget` to Prisma**~~ Done
    (`feat/prisma-dashboards-widgets`). Includes the one-time localStorage import
    and deletes `lib/store.ts`.
-4. Widget-system rework — **done** (`feat/widget-system`, see below). Still to
-   do in this milestone: the **`QueryEngine` abstraction** + a bundled sample
-   SQLite data source so the app works with no signup.
+4. Milestone 4 — **done**: widget-system rework (`feat/widget-system`, see
+   below), then `QueryEngine` + the Claude viz agent + editable widgets
+   (`feat/viz-agent`). Still open: a bundled zero-setup sample SQLite source.
 5. **Cleanup pass:** remove fake UI, add `typecheck`/`test` scripts + Vitest +
    CI, write the README.
 
@@ -171,24 +179,29 @@ All five points landed as one commit each, plus a menu fix:
 4. `parseChartIntent` — "pie chart of X" / "as a table" / "just the number"
    override the shape heuristic when the data supports it.
 5. `ChatPanel` keeps the last widget; a refinement message ("make that a pie
-   chart") re-renders it via `retypeWidget` with no SnowLeopard call.
+   chart") re-renders it via `retypeSpec` with no SnowLeopard call.
 6. Fixed the widget options menu (was clipped by the card's `overflow-hidden`
    — now the Radix `DropdownMenu`).
 
-Still open in milestone 4: the `QueryEngine` abstraction and the bundled
-zero-setup sample data source.
+### Viz agent + editable widgets — done (`feat/viz-agent`)
+
+1. Widgets store raw rows + a `WidgetSpec`; `applySpec` renders (sort, cap,
+   repair). `detectWidget` → `detectSpec` (real column names).
+2. `QueryEngine` / `snowLeopardEngine`; route renamed `/api/ai/widget`.
+3. `/settings` + `Setting` table for the encrypted Anthropic key.
+4. `ClaudeVizModel` (Haiku, strict forced tool) + `resolveSpec` fallback chain.
+5. `WidgetEditPanel` — type / title / x-axis / series / sort, live, no agent call.
 
 ## "v1 done" checklist
 
 - [x] Secrets server-side only (encrypted at rest)
-- [x] SQLite persistence — data sources, dashboards, widgets; localStorage import
-      + `lib/store.ts` removed
-- [ ] `QueryEngine` abstraction; Snow Leopard behind it
+- [x] SQLite persistence — data sources, dashboards, widgets, settings
+- [x] `QueryEngine` abstraction; SnowLeopard behind it
+- [x] LLM viz agent (Claude Haiku) with a heuristic + edit-panel floor
 - [ ] One bundled zero-setup data source (sample SQLite), with matching
       example prompts in `ChatPanel`
-- [~] NL-query → widget flow: detector/renderer rework done
-      (`feat/widget-system`); still want the bundled sample to exercise it end
-      to end
+- [x] NL-query → widget flow (agent + heuristic + editable spec); the bundled
+      sample would still let a reviewer exercise it with no signup
 - [ ] Remove dead/fake UI (alert toggles, non-functional refresh interval)
 - [ ] `npm run typecheck` + `npm run test` scripts; Vitest on `widget-detector`
       and route handlers; CI running lint + typecheck + test + build
@@ -199,16 +212,16 @@ zero-setup sample data source.
 
 ## Known debt
 
-- `lib/widget-detector.ts:15` — `void NUMERIC_TYPES` lint hack; `NUMERIC_TYPES`
-  is dead.
 - `components/dashboard/DashboardSettings.tsx` — scheduled/threshold alert
   toggles and the refresh-interval selector are non-functional local state.
+- `components/dashboard/AddWidgetModal.tsx` — dead (not imported); delete or wire.
 - `app/dashboard/[id]/page.tsx` — "Last updated" renders `new Date()` every
   render, not a stored timestamp.
-- `app/api/ai/chat/route.ts` — streaming chat route, kept in sync with the new
-  `dataSourceId` signature but still unused by the UI; decide whether it stays.
-- No error boundary or offline handling around retrieval.
-- `Dashboard.widgetCount` in `lib/types.ts` is stored but never kept in sync
-  with actual widgets.
-- An upstream SnowLeopard auth failure on `/api/ai/retrieve` surfaces as a bare
-  `HTTP Error: 401` with a 500 status — could map to a friendlier 422.
+- `app/api/ai/chat/route.ts` — streaming chat route on the old
+  `{ userQuery, dataSourceId }` shape, unused by the UI; delete or revive.
+- No error boundary or offline handling around retrieval / the agent.
+- `Dashboard.widgetCount` (client type) is computed server-side per request but
+  not reflected back after add/remove without a refetch.
+- Legacy widgets (pre-`feat/viz-agent`) have collapsed data + no spec — they
+  render via the `normalizeChartData` fallback but can't be re-mapped in the
+  edit panel.

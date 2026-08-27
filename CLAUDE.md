@@ -17,26 +17,37 @@ Primary goal right now: a clean, working portfolio piece.
 - Next.js 16 (App Router) + React 19 + TypeScript (strict)
 - Tailwind CSS 4, shadcn/ui (components in `components/ui/` — vendored, don't hand-edit)
 - recharts (charts), react-grid-layout (dashboard grid), sonner (toasts)
-- Data/AI layer: Snow Leopard (`@snowleopard-ai/client`), treated as a
-  swappable engine — see VISION
-- Persistence: **all app data** (data sources, dashboards, widgets) → local
-  SQLite via Prisma 6. No more localStorage for app state.
+- Data layer: SnowLeopard (`@snowleopard-ai/client`) behind a `QueryEngine`
+- Viz layer: Claude Haiku (`@anthropic-ai/sdk`) behind a `VizModel`, with the
+  `detectSpec` heuristic as the always-available fallback
+- Persistence: **all app data** (data sources, dashboards, widgets, settings) →
+  local SQLite via Prisma 6. No localStorage for app state.
+
+## How a widget is made
+
+`ChatPanel` → `POST /api/ai/widget` → `snowLeopardEngine.retrieve()` (rows +
+inferred column types) → `resolveSpec()` (`ClaudeVizModel` if an Anthropic key
+is set, else `detectSpec`) → `{ spec, rows }`. The widget stores the **raw
+rows** in `data` and a `WidgetSpec` (type / xKey / series / sort) in `spec`.
+`WidgetCard` renders `applySpec(data, spec)`. The edit panel writes `spec`
+straight to `PATCH /api/widgets/[id]` — no agent call.
 
 ## Layout
 
 - `app/` — routes. `app/api/**` route handlers are the only server code.
 - `components/` — feature components; `components/ui/` is generated shadcn.
-  `MigrationGate` (in the root layout) does the one-time localStorage → SQLite
-  import and is the *only* component allowed to touch localStorage.
+  `MigrationGate` (root layout) does the one-time localStorage → SQLite import
+  and is the *only* component allowed to touch localStorage.
 - `hooks/` — `useDashboards`, `useWidgets`, `useDataSources` each fetch their
-  `/api/**` routes with optimistic local updates; `useSnowLeopard` wraps
-  retrieval. Components go through these and never `fetch` for data directly.
-- `lib/` — `db.ts` (Prisma singleton, server-only), `crypto.ts` (AES-256-GCM
-  for secrets at rest, server-only), `dashboards.ts` (row → client serializers,
-  server-only), `widget-detector.ts` (pure: rows → widget spec), `types.ts`,
-  `snowleopard.ts` (server-only client factory + `verifyConnection`).
-- `prisma/` — `schema.prisma` and committed `migrations/`. The `dev.db` file is
-  local and gitignored.
+  `/api/**` routes with optimistic local updates; `useWidgetAgent` calls
+  `/api/ai/widget`. Components go through these and never `fetch` for data directly.
+- `lib/` — `db.ts` (Prisma singleton), `crypto.ts` (AES-256-GCM secrets),
+  `settings.ts` (`getAnthropicKey`), `anthropic.ts` / `viz/*` (the viz agent),
+  `query-engine.ts` / `engines/*` (data), `widget-detector.ts` (`detectSpec`
+  heuristic, pure), `widget-spec.ts` (`applySpec`, pure), `widget-data.ts`
+  (chart helpers, pure), `dashboards.ts` (row → client), `types.ts`. Files that
+  touch the DB or an API key import `"server-only"`.
+- `prisma/` — `schema.prisma` and committed `migrations/`. `dev.db` is gitignored.
 - `pydantic-ai/` — standalone Python example, not part of the web app.
 
 ## Commands
@@ -49,18 +60,20 @@ Primary goal right now: a clean, working portfolio piece.
 - `npm run db:studio` — browse the local DB
 
 Requires `.env` (copy `.env.example`) with `DATABASE_URL` and a generated
-`DATA_SOURCE_ENCRYPTION_KEY`. No test or typecheck script yet (see VISION).
+`DATA_SOURCE_ENCRYPTION_KEY`. `ANTHROPIC_API_KEY` is optional (or set it at
+`/settings`). No test or typecheck script yet (see VISION).
 
 ## Conventions
 
-- TypeScript strict; no `any`. Prefer `unknown` + narrowing (see `widget-detector.ts`).
+- TypeScript strict; no `any`. Prefer `unknown` + narrowing (see `widget-spec.ts`).
 - Don't silence lint/TS errors with `void x` or `eslint-disable` — fix the cause.
-  `lib/widget-detector.ts:15` is existing debt to remove, not a pattern to copy.
 - Hooks own persistence via the API. A component that reads/writes `localStorage`
   or `fetch`es a data route directly is a bug (`MigrationGate` is the one
   sanctioned localStorage user).
-- Keep `widget-detector.ts` pure and engine-agnostic: plain rows in, widget
-  spec out. New data engines adapt their output to that shape.
+- `detectSpec` / `applySpec` / `widget-data.ts` are pure and must stay that way.
+  The `VizModel` and `QueryEngine` are the seams for new providers/engines.
+- The viz agent is best-effort: `ClaudeVizModel.proposeSpec` returns `null` on
+  any failure and the caller falls back to `detectSpec`. Never let it throw.
 - `components/ui/` is vendored shadcn — regenerate, don't edit.
 - Secrets never reach the client. API keys are encrypted at rest in the DB
   (`lib/crypto.ts`); route handlers decrypt them; the client sends a
