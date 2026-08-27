@@ -2,7 +2,8 @@
 
 import { MoreVertical, Copy, Trash2, TrendingUp, TrendingDown, GripVertical, Pencil } from "lucide-react"
 import { useState, useRef } from "react"
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
+import { normalizeChartData, seriesLabel } from "@/lib/widget-data"
 
 interface WidgetCardProps {
   widget: {
@@ -45,51 +46,67 @@ export function WidgetCard({ widget, onDelete, onDuplicate, onRename }: WidgetCa
   const renderContent = () => {
     switch (widget.type) {
       case "line-chart": {
-        const chartData = widget.data as Array<Record<string, unknown>>
+        const { rows, xKey, series } = normalizeChartData(widget.data)
         return (
           <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={chartData}>
+            <LineChart data={rows}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="name" stroke="#6b7280" fontSize={12} />
+              <XAxis dataKey={xKey} stroke="#6b7280" fontSize={12} />
               <YAxis stroke="#6b7280" fontSize={12} />
               <Tooltip />
-              <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} />
+              {series.length > 1 && <Legend />}
+              {series.map((key, i) => (
+                <Line
+                  key={key}
+                  type="monotone"
+                  dataKey={key}
+                  name={seriesLabel(key)}
+                  stroke={COLORS[i % COLORS.length]}
+                  strokeWidth={2}
+                  dot={false}
+                />
+              ))}
             </LineChart>
           </ResponsiveContainer>
         )
       }
 
       case "bar-chart": {
-        const chartData = widget.data as Array<Record<string, unknown>>
+        const { rows, xKey, series } = normalizeChartData(widget.data)
         return (
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={chartData}>
+            <BarChart data={rows}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="name" stroke="#6b7280" fontSize={12} />
+              <XAxis dataKey={xKey} stroke="#6b7280" fontSize={12} />
               <YAxis stroke="#6b7280" fontSize={12} />
               <Tooltip />
-              <Bar dataKey="value" fill="#3b82f6" />
+              {series.length > 1 && <Legend />}
+              {series.map((key, i) => (
+                <Bar key={key} dataKey={key} name={seriesLabel(key)} fill={COLORS[i % COLORS.length]} />
+              ))}
             </BarChart>
           </ResponsiveContainer>
         )
       }
 
       case "pie-chart": {
-        const pieData = widget.data as Array<Record<string, unknown>>
+        const { rows, xKey, series } = normalizeChartData(widget.data)
+        const valueKey = series[0] ?? "value"
         return (
           <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie
-                data={pieData}
+                data={rows}
                 cx="50%"
                 cy="50%"
                 labelLine={false}
                 label={PieLabel}
+                nameKey={xKey}
+                dataKey={valueKey}
                 outerRadius={60}
                 fill="#8884d8"
-                dataKey="value"
               >
-                {pieData.map((_entry, index: number) => (
+                {rows.map((_entry, index: number) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>

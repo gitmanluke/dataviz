@@ -1,8 +1,11 @@
+import type { ChartData } from "@/lib/widget-data"
+
 export type WidgetType = "line-chart" | "bar-chart" | "pie-chart" | "stat" | "table"
 
 export interface DetectedWidget {
   widgetType: WidgetType
   title: string
+  // stat: { value, change, trend } · table: Record[] · charts: ChartData
   data: unknown
   confidence: "high" | "medium" | "low"
   sql?: string
@@ -32,15 +35,36 @@ function isIdLike(key: string): boolean {
   return ID_PATTERNS.test(key)
 }
 
-function normalizeForRecharts(
+// Single-measure chart: collapse to { name, value } rows.
+function singleSeries(
   data: Record<string, unknown>[],
   nameKey: string,
   valueKey: string
-): { name: string | number; value: number }[] {
-  return data.map((row) => ({
-    name: row[nameKey] as string | number,
-    value: Number(row[valueKey]),
-  }))
+): ChartData {
+  return {
+    rows: data.map(row => ({
+      name: row[nameKey] as string | number,
+      value: Number(row[valueKey]),
+    })),
+    xKey: "name",
+    series: ["value"],
+  }
+}
+
+// Multi-measure chart: keep the measure columns as separate series.
+function multiSeries(
+  data: Record<string, unknown>[],
+  nameKey: string,
+  measureKeys: string[]
+): ChartData {
+  return {
+    rows: data.map(row => ({
+      name: row[nameKey] as string | number,
+      ...Object.fromEntries(measureKeys.map(k => [k, Number(row[k])])),
+    })),
+    xKey: "name",
+    series: measureKeys,
+  }
 }
 
 export function detectWidget(
@@ -100,7 +124,7 @@ export function detectWidget(
     return {
       widgetType: isTimeAxis ? "line-chart" : usePie ? "pie-chart" : "bar-chart",
       title,
-      data: normalizeForRecharts(rows, xKey, measureKeys[0]),
+      data: singleSeries(rows, xKey, measureKeys[0]),
       confidence: "high",
       sql,
     }
@@ -108,14 +132,10 @@ export function detectWidget(
 
   // Rule 3: an axis + several measures → multi-series bar (or line for a time axis)
   if (xKey && measureKeys.length > 1) {
-    const groupedData = rows.map((row) => ({
-      name: row[xKey] as string,
-      ...Object.fromEntries(measureKeys.map((k) => [k, Number(row[k])])),
-    }))
     return {
       widgetType: isTimeAxis ? "line-chart" : "bar-chart",
       title,
-      data: groupedData,
+      data: multiSeries(rows, xKey, measureKeys),
       confidence: "medium",
       sql,
     }
