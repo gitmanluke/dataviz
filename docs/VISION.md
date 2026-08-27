@@ -28,14 +28,15 @@ The core loop already works:
 Verified by installing and building from a clean checkout:
 
 - **Builds clean.** `npm run build` passes (Next 16, Turbopack), TypeScript OK.
-- **`npm install` needs `--legacy-peer-deps`** — `react-day-picker` (a dead,
-  unused shadcn dependency) pins an old `date-fns`. Fix: delete
-  `components/ui/calendar.tsx` and drop `react-day-picker` + `date-fns` from
-  `package.json` (neither is imported anywhere in `app/`, `components/` outside
-  ui, `hooks/`, or `lib/`).
-- **`npm run lint` — 7 errors.** 3 are the load-from-localStorage-on-mount
-  effects in the `hooks/` (go away with the SQLite migration); 2 are in
-  vendored `components/ui/` (chart, sidebar); 1 in `ChatPanel`.
+- **`npm install` works with no flags** (warm-up cleanup done — removed the
+  dead `react-day-picker` / `date-fns` / `calendar.tsx`). 3 `npm audit`
+  warnings remain, all cleared by a `next` 16.2.1 → 16.3.x bump (not yet done).
+- **`npm run lint` — 9 errors, all pre-existing.** 4 in our code:
+  `set-state-in-effect` in `hooks/useDashboards|useDataSources|useWidgets`
+  (the load-from-localStorage-on-mount pattern — goes away with the SQLite
+  migration) and `ChatPanel.tsx:53`. The other 5 are in vendored
+  `components/ui/` (carousel, chart×2, sidebar, use-mobile) — clear by
+  regenerating those from shadcn.
 - **No tests, no typecheck script.**
 - **Demo needs BYO credentials** — the only data source type is Snow Leopard,
   which needs an API key + uploaded datafile. Nothing works out of the box.
@@ -135,9 +136,8 @@ hard-code it.
 
 ## Suggested order of work
 
-1. **Warm-up:** run it locally (`npm i --legacy-peer-deps && npm run dev`),
-   click through, then clean the dead `react-day-picker`/`date-fns`/`calendar`
-   deps so `npm install` works with no flags.
+1. ~~**Warm-up:** clean the dead deps.~~ Done (commit `2321de8`). Still open:
+   bump `next` 16.2.1 → 16.3.x to clear the 3 audit warnings.
 2. **Prisma + SQLite, `data_sources` first.** Smallest entity, and it's the one
    entangled with the secrets fix. Add Prisma, model `DataSource`, add
    `/api/data-sources` route handlers, swap `useDataSources` internals from
