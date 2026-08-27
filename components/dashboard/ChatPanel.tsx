@@ -42,8 +42,7 @@ export function ChatPanel({ onClose, onAddWidget }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const { isLoading, retrieve } = useSnowLeopard({
-    datafileId: selectedSource?.datafileId ?? "",
-    apiKey: selectedSource?.apiKey ?? "",
+    dataSourceId: selectedSource?.id ?? "",
   })
 
   // Auto-select first connected source

@@ -24,14 +24,24 @@ export interface LayoutItem {
   minH?: number
 }
 
+// Client-safe shape — the API key lives only in the DB (see prisma/schema.prisma)
+// and never leaves the server.
 export interface DataSource {
   id: string
   name: string
   description?: string
+  type: string
+  datafileId: string
+  status: "connected" | "error" | "verifying"
+  createdAt: string  // ISO string
+}
+
+// Payload for creating a data source (POST /api/data-sources).
+export interface NewDataSource {
+  name: string
+  description?: string
   datafileId: string
   apiKey: string
-  status: "connected" | "error" | "verifying"
-  addedAt: string  // ISO string
 }
 
 export interface DashboardStore {

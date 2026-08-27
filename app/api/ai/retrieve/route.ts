@@ -1,32 +1,41 @@
 import { NextRequest, NextResponse } from "next/server"
-import { SnowLeopardClient } from "@snowleopard-ai/client"
 import type { SchemaData, RetrieveResponse } from "@snowleopard-ai/client"
+import { prisma } from "@/lib/db"
+import { decryptSecret } from "@/lib/crypto"
+import { createSnowLeopardClient } from "@/lib/snowleopard"
 import { detectWidget } from "@/lib/widget-detector"
 
 interface RetrieveRequest {
   userQuery: string
-  datafileId: string
-  apiKey: string
+  dataSourceId: string
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as RetrieveRequest
-    const { userQuery, datafileId, apiKey } = body
+    const body = (await request.json()) as Partial<RetrieveRequest>
+    const { userQuery, dataSourceId } = body
 
-    if (!userQuery || !datafileId || !apiKey) {
+    if (!userQuery || !dataSourceId) {
       return NextResponse.json(
-        { error: "userQuery, datafileId, and apiKey are required" },
+        { error: "userQuery and dataSourceId are required" },
         { status: 400 }
       )
     }
 
-    const client = new SnowLeopardClient({ apiKey })
+    const source = await prisma.dataSource.findUnique({ where: { id: dataSourceId } })
+    if (!source) {
+      return NextResponse.json({ error: "Data source not found" }, { status: 404 })
+    }
+
+    const apiKey = decryptSecret(source.apiKeyCipher)
+    const client = createSnowLeopardClient(apiKey)
 
     try {
-      const result = await client.retrieve({ userQuery, datafileId })
+      const result = await client.retrieve({
+        userQuery,
+        datafileId: source.datafileId,
+      })
 
-      // result is RetrieveResponse | APIError
       if (result.__type__ === "apiError") {
         return NextResponse.json(
           { error: result.description, responseStatus: result.responseStatus },
@@ -43,13 +52,11 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Find the first successful SchemaData entry
       const schemaEntry = retrieveResult.data.find(
         (d): d is SchemaData => d.__type__ === "schemaData"
       )
 
       if (!schemaEntry) {
-        // All entries were errorSchemaData
         const errEntry = retrieveResult.data[0]
         const errMsg =
           errEntry && errEntry.__type__ === "errorSchemaData"

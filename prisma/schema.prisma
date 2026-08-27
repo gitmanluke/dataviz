@@ -1,0 +1,22 @@
+// Local SQLite database. See docs/VISION.md for the persistence plan.
+// Run `npm run db:migrate` after changing this file.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model DataSource {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  type         String   @default("snowleopard")
+  datafileId   String
+  apiKeyCipher String // AES-256-GCM payload (see lib/crypto.ts) — never sent to the client
+  status       String   @default("connected")
+  createdAt    DateTime @default(now())
+}

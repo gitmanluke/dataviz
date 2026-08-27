@@ -1,26 +1,36 @@
 import { NextRequest } from "next/server"
-import { SnowLeopardClient } from "@snowleopard-ai/client"
 import type { ResponseData } from "@snowleopard-ai/client"
+import { prisma } from "@/lib/db"
+import { decryptSecret } from "@/lib/crypto"
+import { createSnowLeopardClient } from "@/lib/snowleopard"
 
 interface ChatRequest {
   userQuery: string
-  datafileId: string
-  apiKey: string
+  dataSourceId: string
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as ChatRequest
-    const { userQuery, datafileId, apiKey } = body
+    const body = (await request.json()) as Partial<ChatRequest>
+    const { userQuery, dataSourceId } = body
 
-    if (!userQuery || !datafileId || !apiKey) {
+    if (!userQuery || !dataSourceId) {
       return new Response(
-        JSON.stringify({ error: "userQuery, datafileId, and apiKey are required" }),
+        JSON.stringify({ error: "userQuery and dataSourceId are required" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       )
     }
 
-    const client = new SnowLeopardClient({ apiKey })
+    const source = await prisma.dataSource.findUnique({ where: { id: dataSourceId } })
+    if (!source) {
+      return new Response(JSON.stringify({ error: "Data source not found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      })
+    }
+
+    const client = createSnowLeopardClient(decryptSecret(source.apiKeyCipher))
+    const datafileId = source.datafileId
 
     const stream = new ReadableStream({
       async start(controller) {

@@ -93,33 +93,22 @@ export function DataSourcesClient() {
     setVerifyError(null)
 
     try {
-      const res = await fetch("/api/data-sources/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: apiKey.trim(), datafileId: datafileId.trim() }),
-      })
-
-      const data = await res.json()
-
-      if (!data.ok) {
-        setVerifyError(data.error ?? "Could not connect. Please check your API key and File ID.")
-        setVerifying(false)
-        return
-      }
-
-      add({
+      await add({
         name: name.trim(),
         apiKey: apiKey.trim(),
         datafileId: datafileId.trim(),
         description: description.trim() || undefined,
-        status: "connected",
       })
 
       toast.success(`"${name.trim()}" added successfully`)
       setDialogOpen(false)
       resetDialog()
-    } catch {
-      setVerifyError("Network error — please try again.")
+    } catch (err) {
+      setVerifyError(
+        err instanceof Error
+          ? err.message
+          : "Could not connect. Please check your API key and File ID."
+      )
       setVerifying(false)
     }
   }
@@ -128,12 +117,17 @@ export function DataSourcesClient() {
     setConfirmDeleteId(id)
   }
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!confirmDeleteId) return
-    const ds = dataSources.find(d => d.id === confirmDeleteId)
-    remove(confirmDeleteId)
-    toast.success(`Deleted "${ds?.name ?? "data source"}"`)
+    const id = confirmDeleteId
+    const ds = dataSources.find(d => d.id === id)
     setConfirmDeleteId(null)
+    try {
+      await remove(id)
+      toast.success(`Deleted "${ds?.name ?? "data source"}"`)
+    } catch {
+      toast.error("Could not delete data source")
+    }
   }
 
   const handleCancelDelete = () => {
@@ -268,7 +262,7 @@ export function DataSourcesClient() {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatRelativeTime(ds.addedAt)}
+                      {formatRelativeTime(ds.createdAt)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       {confirmDeleteId === ds.id ? (
