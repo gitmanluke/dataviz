@@ -25,20 +25,23 @@ The core loop already works:
 
 ## Where it stands (updated 2026-08-27)
 
-- **Data sources persist in local SQLite via Prisma 6**, and SnowLeopard API
-  keys are encrypted at rest and never leave the server (branch
-  `feat/prisma-data-sources`). Retrieval routes take a `dataSourceId`.
-- **Dashboards + widgets still on localStorage** — next milestone, same recipe.
+- **All app data persists in local SQLite via Prisma 6** — data sources
+  (`feat/prisma-data-sources`), plus dashboards + widgets
+  (`feat/prisma-dashboards-widgets`, stacked on it). `lib/store.ts` is gone.
+- **SnowLeopard API keys** are encrypted at rest (`lib/crypto.ts`) and never
+  leave the server; retrieval routes take a `dataSourceId`.
+- **One-time localStorage import** (`components/MigrationGate.tsx` +
+  `/api/migrate`) moves existing browser dashboards/widgets into the DB on
+  first load, then clears them. Idempotent.
 - **Builds clean.** `npm run build` passes (Next 16, Turbopack), TypeScript OK.
 - **`npm install` works with no flags.** 3 `npm audit` warnings remain, all
   cleared by a `next` 16.2.1 → 16.3.x bump (not yet done).
-- **`npm run lint` — 8 errors, all pre-existing.** 3 in our code:
-  `set-state-in-effect` in `hooks/useDashboards|useWidgets` (the
-  load-from-localStorage-on-mount pattern — goes with the next migration) and
-  `ChatPanel.tsx`. The other 5 are in vendored `components/ui/` (carousel,
-  chart×2, sidebar, use-mobile) — clear by regenerating those from shadcn.
-- Setup now needs `.env` (copy `.env.example`, generate
+- **`npm run lint` — 6 errors, all pre-existing and none in our code:**
+  `ChatPanel.tsx:52` and 5 in vendored `components/ui/` (carousel, chart×2,
+  sidebar, use-mobile) — clear by regenerating those from shadcn.
+- Setup needs `.env` (copy `.env.example`, generate
   `DATA_SOURCE_ENCRYPTION_KEY`) and `npm run db:migrate`.
+- **Known broken:** the widget rendering / detection issues (see milestone 4).
 - **No tests, no typecheck script.**
 - **Demo needs BYO credentials** — the only data source type is Snow Leopard,
   which needs an API key + uploaded datafile. Nothing works out of the box.
@@ -145,8 +148,9 @@ hard-code it.
 2. ~~**Prisma + SQLite, `data_sources` first** + secrets fix.~~ Done
    (`feat/prisma-data-sources`). Data sources persist in SQLite; keys encrypted
    at rest; `/api/ai/retrieve` + `/chat` take a `dataSourceId`.
-3. **`Dashboard` + `Widget` to Prisma** using the same recipe; add the
-   one-time localStorage import.
+3. ~~**`Dashboard` + `Widget` to Prisma**~~ Done
+   (`feat/prisma-dashboards-widgets`). Includes the one-time localStorage import
+   and deletes `lib/store.ts`.
 4. **`QueryEngine` abstraction** + bundled sample SQLite data source so the
    app works with no signup — **and the widget-system rework** (see below).
 5. **Cleanup pass:** remove fake UI, add `typecheck`/`test` scripts + Vitest +
@@ -174,8 +178,8 @@ Needs:
 ## "v1 done" checklist
 
 - [x] Secrets server-side only (encrypted at rest)
-- [~] SQLite persistence — data sources done; dashboards + widgets + localStorage
-      import still to do
+- [x] SQLite persistence — data sources, dashboards, widgets; localStorage import
+      + `lib/store.ts` removed
 - [ ] `QueryEngine` abstraction; Snow Leopard behind it
 - [ ] One bundled zero-setup data source (sample SQLite), with matching
       example prompts in `ChatPanel`

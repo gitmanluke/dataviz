@@ -27,8 +27,8 @@ export function HomeClient() {
     )
   }
 
-  const handleCreateDashboard = () => {
-    const newDashboard = create("New Dashboard")
+  const handleCreateDashboard = async () => {
+    const newDashboard = await create("New Dashboard")
     router.push(`/dashboard/${newDashboard.id}`)
   }
 

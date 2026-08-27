@@ -7,9 +7,11 @@ export interface Dashboard {
   widgetCount: number
 }
 
+export type WidgetType = "line-chart" | "bar-chart" | "pie-chart" | "stat" | "table"
+
 export interface Widget {
   id: string
-  type: "line-chart" | "bar-chart" | "pie-chart" | "stat" | "table"
+  type: WidgetType
   title: string
   data: unknown
 }
@@ -47,4 +49,10 @@ export interface NewDataSource {
 export interface DashboardStore {
   widgets: Widget[]
   layouts: LayoutItem[]
+}
+
+// Payload for the one-time localStorage → SQLite import (POST /api/migrate).
+export interface MigrationPayload {
+  dashboards: Dashboard[]
+  widgetStores: Record<string, DashboardStore>
 }

@@ -29,8 +29,9 @@ export default function DashboardPage() {
   useEffect(() => {
     if (dashboardId === "new" && !hasCreated.current && dashboardsInitialized) {
       hasCreated.current = true
-      const newDash = create("New Dashboard")
-      router.replace(`/dashboard/${newDash.id}`)
+      create("New Dashboard").then(newDash => {
+        router.replace(`/dashboard/${newDash.id}`)
+      })
     }
   }, [dashboardId, dashboardsInitialized, create, router])
 
@@ -44,8 +45,8 @@ export default function DashboardPage() {
   const dashboard: Dashboard | undefined = dashboards.find(d => d.id === dashboardId)
 
   // Fallback name while loading or for unknown IDs
-  const dashboardName = dashboard?.name
-    ?? (dashboardId === "new" ? "New Dashboard" : dashboardId.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '))
+  const dashboardName =
+    dashboard?.name ?? (dashboardId === "new" ? "New Dashboard" : "Dashboard")
 
   const handleAddWidget = (widget: Omit<Widget, "id">) => {
     add(widget)

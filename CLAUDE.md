@@ -19,19 +19,21 @@ Primary goal right now: a clean, working portfolio piece.
 - recharts (charts), react-grid-layout (dashboard grid), sonner (toasts)
 - Data/AI layer: Snow Leopard (`@snowleopard-ai/client`), treated as a
   swappable engine — see VISION
-- Persistence: **data sources** → local SQLite via Prisma 6.
-  **dashboards + widgets** → still browser localStorage (next milestone).
+- Persistence: **all app data** (data sources, dashboards, widgets) → local
+  SQLite via Prisma 6. No more localStorage for app state.
 
 ## Layout
 
 - `app/` — routes. `app/api/**` route handlers are the only server code.
 - `components/` — feature components; `components/ui/` is generated shadcn.
-- `hooks/` — `useDashboards`, `useWidgets` (localStorage), `useDataSources`
-  (fetches `/api/data-sources`); `useSnowLeopard` wraps retrieval. Components go
-  through these and never touch storage or `fetch` for data directly.
+  `MigrationGate` (in the root layout) does the one-time localStorage → SQLite
+  import and is the *only* component allowed to touch localStorage.
+- `hooks/` — `useDashboards`, `useWidgets`, `useDataSources` each fetch their
+  `/api/**` routes with optimistic local updates; `useSnowLeopard` wraps
+  retrieval. Components go through these and never `fetch` for data directly.
 - `lib/` — `db.ts` (Prisma singleton, server-only), `crypto.ts` (AES-256-GCM
-  for secrets at rest, server-only), `store.ts` (localStorage helpers),
-  `widget-detector.ts` (pure: rows → widget spec), `types.ts`,
+  for secrets at rest, server-only), `dashboards.ts` (row → client serializers,
+  server-only), `widget-detector.ts` (pure: rows → widget spec), `types.ts`,
   `snowleopard.ts` (server-only client factory + `verifyConnection`).
 - `prisma/` — `schema.prisma` and committed `migrations/`. The `dev.db` file is
   local and gitignored.
@@ -54,8 +56,9 @@ Requires `.env` (copy `.env.example`) with `DATABASE_URL` and a generated
 - TypeScript strict; no `any`. Prefer `unknown` + narrowing (see `widget-detector.ts`).
 - Don't silence lint/TS errors with `void x` or `eslint-disable` — fix the cause.
   `lib/widget-detector.ts:15` is existing debt to remove, not a pattern to copy.
-- Hooks own persistence. A component that reads/writes `localStorage` directly
-  is a bug.
+- Hooks own persistence via the API. A component that reads/writes `localStorage`
+  or `fetch`es a data route directly is a bug (`MigrationGate` is the one
+  sanctioned localStorage user).
 - Keep `widget-detector.ts` pure and engine-agnostic: plain rows in, widget
   spec out. New data engines adapt their output to that shape.
 - `components/ui/` is vendored shadcn — regenerate, don't edit.

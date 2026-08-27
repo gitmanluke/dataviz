@@ -20,3 +20,32 @@ model DataSource {
   status       String   @default("connected")
   createdAt    DateTime @default(now())
 }
+
+model Dashboard {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @default("")
+  isFavorite  Boolean  @default(false)
+  lastViewed  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  widgets     Widget[]
+}
+
+model Widget {
+  id          String    @id @default(cuid())
+  dashboardId String
+  dashboard   Dashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  type        String
+  title       String
+  data        String    @default("null") // JSON-serialized widget payload
+  // react-grid-layout position/size
+  x           Int       @default(0)
+  y           Int       @default(0)
+  w           Int       @default(4)
+  h           Int       @default(3)
+  minW        Int?
+  minH        Int?
+  createdAt   DateTime  @default(now())
+
+  @@index([dashboardId])
+}

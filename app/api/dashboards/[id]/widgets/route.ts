@@ -1,0 +1,97 @@
+import { NextRequest, NextResponse } from "next/server"
+import { prisma } from "@/lib/db"
+import { widgetToClient } from "@/lib/dashboards"
+import type { LayoutItem, Widget } from "@/lib/types"
+
+// GET /api/dashboards/:id/widgets -> { widgets, layouts }
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+  const rows = await prisma.widget.findMany({
+    where: { dashboardId: id },
+    orderBy: { createdAt: "asc" },
+  })
+  const mapped = rows.map(widgetToClient)
+  return NextResponse.json({
+    widgets: mapped.map(m => m.widget),
+    layouts: mapped.map(m => m.layout),
+  })
+}
+
+// POST /api/dashboards/:id/widgets -> { widget, layout }   body: { type, title, data }
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+
+  const dashboard = await prisma.dashboard.findUnique({ where: { id } })
+  if (!dashboard) {
+    return NextResponse.json({ error: "Dashboard not found" }, { status: 404 })
+  }
+
+  let body: Partial<Omit<Widget, "id">>
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+  }
+  if (!body.type || !body.title) {
+    return NextResponse.json({ error: "type and title are required" }, { status: 400 })
+  }
+
+  // Place the new widget below everything currently on the grid.
+  const existing = await prisma.widget.findMany({
+    where: { dashboardId: id },
+    select: { y: true, h: true },
+  })
+  const nextY = existing.reduce((max, w) => Math.max(max, w.y + w.h), 0)
+
+  const row = await prisma.widget.create({
+    data: {
+      dashboardId: id,
+      type: body.type,
+      title: body.title,
+      data: JSON.stringify(body.data ?? null),
+      x: 0,
+      y: nextY,
+      w: 4,
+      h: 3,
+      minW: 2,
+      minH: 2,
+    },
+  })
+
+  return NextResponse.json(widgetToClient(row), { status: 201 })
+}
+
+// PUT /api/dashboards/:id/widgets -> 204   body: LayoutItem[]  (bulk layout save)
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+
+  let items: LayoutItem[]
+  try {
+    items = await request.json()
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+  }
+  if (!Array.isArray(items)) {
+    return NextResponse.json({ error: "Expected an array of layout items" }, { status: 400 })
+  }
+
+  await prisma.$transaction(
+    items.map(it =>
+      prisma.widget.updateMany({
+        where: { id: it.i, dashboardId: id },
+        data: { x: it.x, y: it.y, w: it.w, h: it.h },
+      })
+    )
+  )
+
+  return new NextResponse(null, { status: 204 })
+}

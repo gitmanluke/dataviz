@@ -1,72 +1,106 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { getStore, setStore } from "@/lib/store"
+import { useCallback, useEffect, useRef, useState } from "react"
 import type { Widget, LayoutItem, DashboardStore } from "@/lib/types"
 
 const EMPTY: DashboardStore = { widgets: [], layouts: [] }
 
+/**
+ * Widgets for one dashboard, backed by SQLite. Same surface as before; reads
+ * once on mount, mutations are optimistic. Layout drags are debounced before
+ * they hit the API.
+ */
 export function useWidgets(dashboardId: string) {
-  const storeKey = `widgets:${dashboardId}`
-
-  const [store, setStore_] = useState<DashboardStore>(EMPTY)
+  const [store, setStore] = useState<DashboardStore>(EMPTY)
   const [initialized, setInitialized] = useState(false)
+  const layoutTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (!dashboardId) return
-    const stored = getStore<DashboardStore>(storeKey, EMPTY)
-    setStore_(stored)
-    setInitialized(true)
-  }, [dashboardId, storeKey])
+    let cancelled = false
+    // dashboardId only changes via full navigation (each /dashboard/[id] is a
+    // fresh mount), so `initialized` starting false on mount is enough.
+    fetch(`/api/dashboards/${dashboardId}/widgets`)
+      .then(res => (res.ok ? res.json() : EMPTY))
+      .then((data: DashboardStore) => {
+        if (!cancelled) setStore(data ?? EMPTY)
+      })
+      .catch(() => {
+        if (!cancelled) setStore(EMPTY)
+      })
+      .finally(() => {
+        if (!cancelled) setInitialized(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [dashboardId])
 
-  const save = useCallback((updater: (prev: DashboardStore) => DashboardStore, key: string) => {
-    setStore_(prev => {
-      const next = updater(prev)
-      setStore<DashboardStore>(key, next)
-      return next
+  const add = useCallback(async (widget: Omit<Widget, "id">): Promise<Widget> => {
+    const res = await fetch(`/api/dashboards/${dashboardId}/widgets`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(widget),
     })
-  }, [])
-
-  const add = useCallback((widget: Omit<Widget, "id">): Widget => {
-    const newWidget: Widget = { ...widget, id: String(Date.now()) }
-    const newLayout: LayoutItem = { i: newWidget.id, x: 0, y: Infinity, w: 4, h: 3, minW: 2, minH: 2 }
-    save(prev => ({
-      widgets: [...prev.widgets, newWidget],
-      layouts: [...prev.layouts, newLayout],
-    }), storeKey)
-    return newWidget
-  }, [save, storeKey])
+    if (!res.ok) throw new Error("Could not add widget")
+    const { widget: created, layout } = (await res.json()) as {
+      widget: Widget
+      layout: LayoutItem
+    }
+    setStore(prev => ({
+      widgets: [...prev.widgets, created],
+      layouts: [...prev.layouts, layout],
+    }))
+    return created
+  }, [dashboardId])
 
   const remove = useCallback((id: string) => {
-    save(prev => ({
+    setStore(prev => ({
       widgets: prev.widgets.filter(w => w.id !== id),
       layouts: prev.layouts.filter(l => l.i !== id),
-    }), storeKey)
-  }, [save, storeKey])
+    }))
+    void fetch(`/api/widgets/${id}`, { method: "DELETE" }).catch(() => {})
+  }, [])
 
-  const duplicate = useCallback((id: string) => {
-    save(prev => {
-      const original = prev.widgets.find(w => w.id === id)
-      if (!original) return prev
-      const newWidget: Widget = { ...original, id: String(Date.now()), title: original.title + " (Copy)" }
-      const newLayout: LayoutItem = { i: newWidget.id, x: 0, y: Infinity, w: 4, h: 3, minW: 2, minH: 2 }
-      return {
-        widgets: [...prev.widgets, newWidget],
-        layouts: [...prev.layouts, newLayout],
-      }
-    }, storeKey)
-  }, [save, storeKey])
+  const duplicate = useCallback(async (id: string) => {
+    const original = store.widgets.find(w => w.id === id)
+    if (!original) return
+    await add({
+      type: original.type,
+      title: `${original.title} (Copy)`,
+      data: original.data,
+    })
+  }, [store.widgets, add])
 
   const updateLayouts = useCallback((newLayouts: LayoutItem[]) => {
-    save(prev => ({ ...prev, layouts: newLayouts }), storeKey)
-  }, [save, storeKey])
+    setStore(prev => ({ ...prev, layouts: newLayouts }))
+    if (layoutTimer.current) clearTimeout(layoutTimer.current)
+    layoutTimer.current = setTimeout(() => {
+      void fetch(`/api/dashboards/${dashboardId}/widgets`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newLayouts),
+      }).catch(() => {})
+    }, 500)
+  }, [dashboardId])
 
   const rename = useCallback((id: string, title: string) => {
-    save(prev => ({
+    setStore(prev => ({
       ...prev,
-      widgets: prev.widgets.map(w => w.id === id ? { ...w, title } : w),
-    }), storeKey)
-  }, [save, storeKey])
+      widgets: prev.widgets.map(w => (w.id === id ? { ...w, title } : w)),
+    }))
+    void fetch(`/api/widgets/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title }),
+    }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (layoutTimer.current) clearTimeout(layoutTimer.current)
+    }
+  }, [])
 
   return {
     widgets: store.widgets,

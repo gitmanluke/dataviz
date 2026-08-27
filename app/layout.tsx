@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { Toaster } from "sonner"
 import Navigation from "@/components/layout/Navigation"
+import { MigrationGate } from "@/components/MigrationGate"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -16,10 +17,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <div className="min-h-screen bg-background">
-          <Navigation />
-          <main>{children}</main>
-        </div>
+        <MigrationGate>
+          <div className="min-h-screen bg-background">
+            <Navigation />
+            <main>{children}</main>
+          </div>
+        </MigrationGate>
         <Toaster position="top-right" />
       </body>
     </html>
