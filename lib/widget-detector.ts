@@ -9,20 +9,27 @@ export interface DetectedWidget {
 }
 
 const DATE_PATTERNS = /date|time|month|year|day|week|period|quarter/i
-const NUMERIC_TYPES = ["number", "integer", "float", "decimal", "bigint"]
 
-// Suppress unused variable warning — kept for documentation purposes
-void NUMERIC_TYPES
+// Columns that are identifiers, not measures — exclude them from chart detection
+// (they still show up in the table view).
+const ID_PATTERNS = /^(id|.*_id|uuid|guid|.*_uuid|pk|fk|key|.*_key|index|rownum)$/i
+
+// Query wording that asks for a parts-of-a-whole view.
+const PIE_INTENT = /percent|percentage|proportion|share|breakdown|composition|split|distribution|make.?up|ratio/i
 
 function isNumeric(value: unknown): boolean {
   return (
     typeof value === "number" ||
-    (typeof value === "string" && !isNaN(Number(value)) && value.trim() !== "")
+    (typeof value === "string" && value.trim() !== "" && !isNaN(Number(value)))
   )
 }
 
 function isDateLike(key: string): boolean {
   return DATE_PATTERNS.test(key)
+}
+
+function isIdLike(key: string): boolean {
+  return ID_PATTERNS.test(key)
 }
 
 function normalizeForRecharts(
@@ -71,46 +78,42 @@ export function detectWidget(
 
   const rows = rawData as Record<string, unknown>[]
   const keys = Object.keys(rows[0])
-  const numericKeys = keys.filter((k) => isNumeric(rows[0][k]))
-  const stringKeys = keys.filter((k) => !isNumeric(rows[0][k]))
-  const dateKeys = keys.filter((k) => isDateLike(k))
 
-  // Rule 2: Has date column + 1 numeric → line chart
-  if (dateKeys.length >= 1 && numericKeys.length === 1) {
-    const dateKey = dateKeys[0]
-    const valueKey = numericKeys[0]
+  // Classify columns, ignoring identifier columns for charting purposes.
+  const chartKeys = keys.filter(k => !isIdLike(k))
+  const dateKeys = chartKeys.filter(isDateLike)
+  // Measures = numeric columns that aren't dates (a "year" column is numeric but
+  // it's an axis, not a value to plot).
+  const measureKeys = chartKeys.filter(k => isNumeric(rows[0][k]) && !isDateLike(k))
+  // Categories = non-numeric, non-date columns.
+  const categoryKeys = chartKeys.filter(
+    k => !isNumeric(rows[0][k]) && !isDateLike(k)
+  )
+
+  const wantsPie = PIE_INTENT.test(userQuery)
+  const xKey = dateKeys[0] ?? categoryKeys[0]
+  const isTimeAxis = dateKeys.length >= 1
+
+  // Rule 2: an axis (date or category) + exactly one measure
+  if (xKey && measureKeys.length === 1) {
+    const usePie = !isTimeAxis && wantsPie && rows.length <= 8
     return {
-      widgetType: "line-chart",
+      widgetType: isTimeAxis ? "line-chart" : usePie ? "pie-chart" : "bar-chart",
       title,
-      data: normalizeForRecharts(rows, dateKey, valueKey),
+      data: normalizeForRecharts(rows, xKey, measureKeys[0]),
       confidence: "high",
       sql,
     }
   }
 
-  // Rule 3 & 4: 1 string col + 1 numeric → pie (≤8 rows) or bar (>8 rows)
-  if (stringKeys.length === 1 && numericKeys.length === 1) {
-    const nameKey = stringKeys[0]
-    const valueKey = numericKeys[0]
-    const normalized = normalizeForRecharts(rows, nameKey, valueKey)
-    return {
-      widgetType: rows.length <= 8 ? "pie-chart" : "bar-chart",
-      title,
-      data: normalized,
-      confidence: "high",
-      sql,
-    }
-  }
-
-  // Rule 5: 1 string + multiple numerics → grouped bar chart
-  if (stringKeys.length >= 1 && numericKeys.length > 1) {
-    const nameKey = stringKeys[0]
+  // Rule 3: an axis + several measures → multi-series bar (or line for a time axis)
+  if (xKey && measureKeys.length > 1) {
     const groupedData = rows.map((row) => ({
-      name: row[nameKey] as string,
-      ...Object.fromEntries(numericKeys.map((k) => [k, Number(row[k])])),
+      name: row[xKey] as string,
+      ...Object.fromEntries(measureKeys.map((k) => [k, Number(row[k])])),
     }))
     return {
-      widgetType: "bar-chart",
+      widgetType: isTimeAxis ? "line-chart" : "bar-chart",
       title,
       data: groupedData,
       confidence: "medium",
@@ -118,13 +121,14 @@ export function detectWidget(
     }
   }
 
-  // Rule 6: 4+ columns → table (high confidence)
-  if (keys.length >= 4) {
-    return { widgetType: "table", title, data: rows, confidence: "high", sql }
+  // Rule 4: nothing chartable → table
+  return {
+    widgetType: "table",
+    title,
+    data: rows,
+    confidence: keys.length >= 4 ? "high" : "low",
+    sql,
   }
-
-  // Fallback
-  return { widgetType: "table", title, data: rows, confidence: "low", sql }
 }
 
 function generateTitle(userQuery: string): string {
