@@ -290,13 +290,13 @@
 }
 
 .react-grid-item.react-grid-placeholder {
-  background: rgb(59 130 246 / 0.2);
-  opacity: 0.2;
+  background: rgb(96 165 250 / 0.25); /* blue-400 */
+  opacity: 1;
   transition-duration: 100ms;
   z-index: 2;
   user-select: none;
   border-radius: 0.5rem;
-  border: 2px dashed rgb(59 130 246);
+  border: 2px dashed rgb(59 130 246); /* blue-500 */
 }
 
 .react-grid-item.resizing {

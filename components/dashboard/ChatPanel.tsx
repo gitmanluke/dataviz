@@ -41,7 +41,15 @@ export function ChatPanel({ onClose, onAddWidget }: ChatPanelProps) {
   }])
   const [input, setInput] = useState("")
   const [lastResult, setLastResult] = useState<WidgetResult | null>(null)
+  const [aiEnabled, setAiEnabled] = useState<boolean | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then(r => r.json())
+      .then((d: { anthropicKeyConfigured: boolean }) => setAiEnabled(d.anthropicKeyConfigured))
+      .catch(() => setAiEnabled(false))
+  }, [])
 
   const { isLoading, generate } = useWidgetAgent({
     dataSourceId: selectedSource?.id ?? "",
@@ -171,6 +179,21 @@ export function ChatPanel({ onClose, onAddWidget }: ChatPanelProps) {
             </select>
           </div>
         )}
+        {aiEnabled !== null && (
+          <p className="text-[10px] text-gray-400 mt-1.5">
+            {aiEnabled ? (
+              <span className="inline-flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-blue-500" />
+                Claude is choosing the charts
+              </span>
+            ) : (
+              <>
+                Using built-in chart rules.{" "}
+                <a href="/settings" className="text-blue-600 hover:underline">Enable Claude →</a>
+              </>
+            )}
+          </p>
+        )}
       </div>
 
       {/* Messages */}
@@ -197,6 +220,9 @@ export function ChatPanel({ onClose, onAddWidget }: ChatPanelProps) {
                         <span className="text-xs font-semibold text-gray-800 flex-1 truncate">
                           {msg.widget.spec.title}
                         </span>
+                        {msg.widget.usedAgent && (
+                          <Sparkles className="w-3 h-3 text-blue-500 shrink-0" aria-label="Chosen by Claude" />
+                        )}
                         <span className="text-[10px] text-gray-400 capitalize shrink-0">
                           {msg.widget.spec.type.replace("-", " ")}
                         </span>

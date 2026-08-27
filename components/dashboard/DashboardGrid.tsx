@@ -7,7 +7,8 @@ import dynamic from "next/dynamic"
 import type { Layout } from "react-grid-layout"
 import { toast } from "sonner"
 import type { Widget, LayoutItem, WidgetSpec } from "@/lib/types"
-import "react-grid-layout/css/styles.css"
+// react-grid-layout's stylesheet (incl. its default red drag placeholder) lives
+// in app/globals.css, customised — don't re-import the package CSS here.
 
 const GridLayout = dynamic(() => import("react-grid-layout"), { ssr: false })
 

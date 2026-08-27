@@ -53,17 +53,33 @@ export function WidgetCard({ widget, onDelete, onDuplicate, onRename, onUpdateSp
   const [renameValue, setRenameValue] = useState(widget.title)
   const [editOpen, setEditOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const renameStartedAt = useRef(0)
 
   const startRename = () => {
     setRenameValue(widget.title)
     setIsRenaming(true)
-    setTimeout(() => inputRef.current?.select(), 0)
+    renameStartedAt.current = Date.now()
+    // Wait a frame so the input is mounted, then take focus (the dropdown's
+    // close-autofocus is disabled below so it won't steal it back).
+    requestAnimationFrame(() => {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    })
   }
 
   const commitRename = () => {
     const trimmed = renameValue.trim()
     if (trimmed && trimmed !== widget.title) onRename(trimmed)
     setIsRenaming(false)
+  }
+
+  // Ignore the focus-thrash blur that fires right as the input mounts.
+  const handleBlur = () => {
+    if (Date.now() - renameStartedAt.current < 250) {
+      requestAnimationFrame(() => inputRef.current?.focus())
+      return
+    }
+    commitRename()
   }
 
   const view: ChartView = widget.spec
@@ -224,10 +240,10 @@ export function WidgetCard({ widget, onDelete, onDuplicate, onRename, onUpdateSp
               ref={inputRef}
               value={renameValue}
               onChange={e => setRenameValue(e.target.value)}
-              onBlur={commitRename}
+              onBlur={handleBlur}
               onKeyDown={e => {
-                if (e.key === "Enter") commitRename()
-                if (e.key === "Escape") setIsRenaming(false)
+                if (e.key === "Enter") { e.preventDefault(); commitRename() }
+                if (e.key === "Escape") { e.preventDefault(); setIsRenaming(false) }
               }}
               onClick={e => e.stopPropagation()}
               onMouseDown={e => e.stopPropagation()}
@@ -236,6 +252,7 @@ export function WidgetCard({ widget, onDelete, onDuplicate, onRename, onUpdateSp
           ) : (
             <h3
               className="font-semibold text-gray-900 truncate cursor-text"
+              onMouseDown={e => e.stopPropagation()}
               onDoubleClick={startRename}
               title="Double-click to rename"
             >
@@ -252,7 +269,11 @@ export function WidgetCard({ widget, onDelete, onDuplicate, onRename, onUpdateSp
             >
               <MoreVertical className="w-4 h-4" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" onMouseDown={e => e.stopPropagation()}>
+            <DropdownMenuContent
+              align="end"
+              onMouseDown={e => e.stopPropagation()}
+              onCloseAutoFocus={e => e.preventDefault()}
+            >
               <DropdownMenuItem onSelect={() => setEditOpen(true)}>
                 <SlidersHorizontal className="w-4 h-4 mr-2" />
                 Edit
