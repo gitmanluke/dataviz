@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
   Plus, CheckCircle, AlertCircle, Loader2, Trash2, Eye, EyeOff,
-  Database, Upload, ChevronRight, ChevronDown, FileSpreadsheet, FilePlus,
+  Database, Upload, ChevronRight, ChevronDown, FileSpreadsheet, FilePlus, Sheet,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useDataSources } from "@/hooks/useDataSources"
+import { GoogleSheetDialog } from "./GoogleSheetDialog"
 import type { DataSource } from "@/lib/types"
 
 interface TableInfo {
@@ -38,9 +39,17 @@ function formatRelativeTime(iso: string): string {
 }
 
 export function DataSourcesClient() {
-  const { dataSources, initialized, add, upload, remove } = useDataSources()
-  const [dialog, setDialog] = useState<"none" | "snowleopard" | "upload">("none")
+  const { dataSources, initialized, add, upload, addSheet, remove } = useDataSources()
+  const [dialog, setDialog] = useState<"none" | "snowleopard" | "upload" | "sheets">("none")
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [googleConnected, setGoogleConnected] = useState(false)
+
+  useEffect(() => {
+    fetch("/api/integrations/google")
+      .then(r => (r.ok ? r.json() : null))
+      .then((d: { connected?: boolean } | null) => setGoogleConnected(Boolean(d?.connected)))
+      .catch(() => {})
+  }, [])
 
   const handleDelete = async (id: string) => {
     const ds = dataSources.find(d => d.id === id)
@@ -82,6 +91,10 @@ export function DataSourcesClient() {
             <DropdownMenuItem onSelect={() => setDialog("upload")}>
               <Upload className="w-4 h-4 mr-2" />
               Upload files (CSV / SQLite)
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setDialog("sheets")}>
+              <Sheet className="w-4 h-4 mr-2" />
+              Connect Google Sheets
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => setDialog("snowleopard")}>
               <Database className="w-4 h-4 mr-2" />
@@ -138,6 +151,12 @@ export function DataSourcesClient() {
         open={dialog === "upload"}
         onClose={() => setDialog("none")}
         upload={upload}
+      />
+      <GoogleSheetDialog
+        open={dialog === "sheets"}
+        onClose={() => setDialog("none")}
+        connected={googleConnected}
+        addSheet={addSheet}
       />
     </div>
   )

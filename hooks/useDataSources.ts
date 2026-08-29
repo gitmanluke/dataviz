@@ -56,11 +56,32 @@ export function useDataSources() {
     return created
   }, [])
 
+  // Connects a Google spreadsheet as a new "sheets" data source. Throws on failure.
+  const addSheet = useCallback(
+    async (payload: {
+      name?: string
+      description?: string
+      spreadsheetId: string
+      refreshInterval?: string
+    }): Promise<DataSource> => {
+      const res = await fetch("/api/data-sources/sheets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error(await readError(res))
+      const created = (await res.json()) as DataSource
+      setDataSources(prev => [created, ...prev])
+      return created
+    },
+    [],
+  )
+
   const remove = useCallback(async (id: string): Promise<void> => {
     const res = await fetch(`/api/data-sources/${id}`, { method: "DELETE" })
     if (!res.ok && res.status !== 404) throw new Error(await readError(res))
     setDataSources(prev => prev.filter(ds => ds.id !== id))
   }, [])
 
-  return { dataSources, initialized, add, upload, remove }
+  return { dataSources, initialized, add, upload, addSheet, remove }
 }
