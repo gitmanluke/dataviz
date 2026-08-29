@@ -16,6 +16,16 @@ export interface ParsedTable {
 const IDENT_OK = /^[A-Za-z_][A-Za-z0-9_]*$/
 const SQLITE_MAGIC = Buffer.from("SQLite format 3\0", "binary")
 
+/** A safe SQLite table name from an arbitrary label (a file stem, a sheet tab
+ *  title). Non-identifier chars collapse to `_`; a leading digit gets a `t_`. */
+export function safeTableName(label: string): string {
+  const clean = String(label)
+    .trim()
+    .replace(/[^A-Za-z0-9_]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+  return /^[A-Za-z_]/.test(clean) ? clean : `t_${clean || "table"}`
+}
+
 /** Quote an identifier so it can't break out of its position; reject control chars. */
 export function safeIdent(name: string): string {
   const s = String(name).trim()

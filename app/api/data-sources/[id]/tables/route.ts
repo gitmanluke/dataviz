@@ -10,7 +10,7 @@ export async function GET(
 
   const source = await prisma.dataSource.findUnique({ where: { id } })
   if (!source) return NextResponse.json({ error: "Data source not found" }, { status: 404 })
-  if (source.type !== "files") return NextResponse.json([])
+  if (source.type !== "files" && source.type !== "sheets") return NextResponse.json([])
 
   return NextResponse.json(readTables(id))
 }

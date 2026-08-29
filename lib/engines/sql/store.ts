@@ -16,7 +16,9 @@ export function sourceDbExists(sourceId: string): boolean {
 /** Read/write handle — used only during ingestion. */
 export function openWritable(sourceId: string): Database.Database {
   mkdirSync(ROOT, { recursive: true })
-  return new Database(sourceDbPath(sourceId))
+  const db = new Database(sourceDbPath(sourceId))
+  db.pragma("busy_timeout = 5000") // tolerate a concurrent opportunistic sync
+  return db
 }
 
 /** Read-only handle — used for every query. Writes are refused by the driver. */

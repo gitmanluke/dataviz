@@ -4,6 +4,7 @@ import {
   createTable,
   isSqliteBuffer,
   rowsFromCsv,
+  safeTableName,
   tablesFromSqlite,
 } from "@/lib/engines/sql/ingest"
 
@@ -17,9 +18,7 @@ const CSV_EXT = /\.csv$/i
 const DB_EXT = /\.(db|sqlite|sqlite3)$/i
 
 function tableNameFromFile(filename: string): string {
-  const stem = filename.replace(/\.[^.]+$/, "").trim()
-  const clean = stem.replace(/[^A-Za-z0-9_]+/g, "_").replace(/^_+|_+$/g, "")
-  return /^[A-Za-z_]/.test(clean) ? clean : `t_${clean || "table"}`
+  return safeTableName(filename.replace(/\.[^.]+$/, ""))
 }
 
 /** Ingest uploaded files into the source's SQLite DB. Throws on a bad file. */
