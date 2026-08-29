@@ -59,4 +59,10 @@ describe("runSql", () => {
       runSql("SELECT 1", { id: ID, type: "snowleopard" } as Parameters<typeof runSql>[1]),
     ).rejects.toThrow(/can't be queried/i)
   })
+
+  it("runs against a sheets source (same per-source SQLite DB)", async () => {
+    const sheetsSource = { id: ID, type: "sheets" } as Parameters<typeof runSql>[1]
+    const r = await runSql("SELECT count(*) AS n FROM movies", sheetsSource)
+    expect((r.rows[0] as { n: number }).n).toBeGreaterThan(0)
+  })
 })

@@ -77,7 +77,7 @@ function runValidated(db: Database.Database, sql: string, explanation: string | 
  * widget whose underlying data may have changed.
  */
 export async function runSql(sql: string, source: DataSourceRow): Promise<QueryResult> {
-  if (source.type !== "files" || !sourceDbExists(source.id)) {
+  if ((source.type !== "files" && source.type !== "sheets") || !sourceDbExists(source.id)) {
     throw new QueryError("This data source can't be queried directly.", 400)
   }
   const db = openReadonly(source.id)

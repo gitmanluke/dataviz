@@ -77,11 +77,19 @@ export function useDataSources() {
     [],
   )
 
+  // Pulls the latest from Google for a sheets source. Throws on failure.
+  const syncNow = useCallback(async (id: string): Promise<void> => {
+    const res = await fetch(`/api/data-sources/${id}/sync`, { method: "POST" })
+    if (!res.ok) throw new Error(await readError(res))
+    const updated = (await res.json()) as DataSource
+    setDataSources(prev => prev.map(ds => (ds.id === id ? { ...ds, ...updated } : ds)))
+  }, [])
+
   const remove = useCallback(async (id: string): Promise<void> => {
     const res = await fetch(`/api/data-sources/${id}`, { method: "DELETE" })
     if (!res.ok && res.status !== 404) throw new Error(await readError(res))
     setDataSources(prev => prev.filter(ds => ds.id !== id))
   }, [])
 
-  return { dataSources, initialized, add, upload, addSheet, remove }
+  return { dataSources, initialized, add, upload, addSheet, syncNow, remove }
 }

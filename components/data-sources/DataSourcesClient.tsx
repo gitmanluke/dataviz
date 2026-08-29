@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
   Plus, CheckCircle, AlertCircle, Loader2, Trash2, Eye, EyeOff,
-  Database, Upload, ChevronRight, ChevronDown, FileSpreadsheet, FilePlus, Sheet,
+  Database, Upload, ChevronRight, ChevronDown, FileSpreadsheet, FilePlus, Sheet, RefreshCw,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -39,7 +39,7 @@ function formatRelativeTime(iso: string): string {
 }
 
 export function DataSourcesClient() {
-  const { dataSources, initialized, add, upload, addSheet, remove } = useDataSources()
+  const { dataSources, initialized, add, upload, addSheet, syncNow, remove } = useDataSources()
   const [dialog, setDialog] = useState<"none" | "snowleopard" | "upload" | "sheets">("none")
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [googleConnected, setGoogleConnected] = useState(false)
@@ -135,6 +135,7 @@ export function DataSourcesClient() {
                   onAskDelete={() => setConfirmDeleteId(ds.id)}
                   onCancelDelete={() => setConfirmDeleteId(null)}
                   onConfirmDelete={() => handleDelete(ds.id)}
+                  onSync={() => syncNow(ds.id)}
                 />
               ))}
             </tbody>
@@ -165,13 +166,14 @@ export function DataSourcesClient() {
 // --- row -----------------------------------------------------------------
 
 function SourceRow({
-  ds, confirmingDelete, onAskDelete, onCancelDelete, onConfirmDelete,
+  ds, confirmingDelete, onAskDelete, onCancelDelete, onConfirmDelete, onSync,
 }: {
   ds: DataSource
   confirmingDelete: boolean
   onAskDelete: () => void
   onCancelDelete: () => void
   onConfirmDelete: () => void
+  onSync: () => Promise<void>
 }) {
   const [expanded, setExpanded] = useState(false)
   const [tables, setTables] = useState<TableInfo[] | null>(null)
@@ -179,6 +181,8 @@ function SourceRow({
   const fetched = useRef(false)
   const fileInput = useRef<HTMLInputElement>(null)
   const isFiles = ds.type === "files"
+  const isSheets = ds.type === "sheets"
+  const expandable = isFiles || isSheets
 
   const loadTables = useCallback(async () => {
     try {
@@ -191,10 +195,23 @@ function SourceRow({
   }, [ds.id])
 
   useEffect(() => {
-    if (!expanded || !isFiles || fetched.current) return
+    if (!expanded || !expandable || fetched.current) return
     fetched.current = true
     void loadTables()
-  }, [expanded, isFiles, loadTables])
+  }, [expanded, expandable, loadTables])
+
+  const handleSyncNow = async () => {
+    setBusy(true)
+    try {
+      await onSync()
+      await loadTables()
+      toast.success("Synced from Google")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Sync failed")
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const handleAddFiles = async (list: FileList | null) => {
     if (!list || list.length === 0) return
@@ -240,10 +257,10 @@ function SourceRow({
         <td className="px-6 py-4">
           <button
             className="flex items-center gap-1.5 text-left"
-            onClick={() => isFiles && setExpanded(v => !v)}
-            disabled={!isFiles}
+            onClick={() => expandable && setExpanded(v => !v)}
+            disabled={!expandable}
           >
-            {isFiles && (expanded ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />)}
+            {expandable && (expanded ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />)}
             <span>
               <span className="font-medium text-gray-900">{ds.name}</span>
               {ds.description && <p className="text-sm text-gray-500 mt-0.5">{ds.description}</p>}
@@ -251,12 +268,19 @@ function SourceRow({
           </button>
         </td>
         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-          {isFiles ? (
+          {isFiles && (
             <span className="inline-flex items-center gap-1.5">
               <FileSpreadsheet className="w-4 h-4 text-gray-400" />
               Uploaded files
             </span>
-          ) : (
+          )}
+          {isSheets && (
+            <span className="inline-flex items-center gap-1.5">
+              <Sheet className="w-4 h-4 text-green-600" />
+              Google Sheets
+            </span>
+          )}
+          {!isFiles && !isSheets && (
             <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">
               {(ds.datafileId ?? "").length > 20
                 ? `${ds.datafileId!.slice(0, 8)}…${ds.datafileId!.slice(-8)}`
@@ -271,7 +295,10 @@ function SourceRow({
             </span>
           )}
           {ds.status === "error" && (
-            <span className="inline-flex items-center gap-1.5 text-sm text-red-700">
+            <span
+              className="inline-flex items-center gap-1.5 text-sm text-red-700"
+              title={ds.syncError ?? undefined}
+            >
               <AlertCircle className="w-4 h-4" /> Error
             </span>
           )}
@@ -293,7 +320,7 @@ function SourceRow({
           )}
         </td>
       </tr>
-      {expanded && isFiles && (
+      {expanded && expandable && (
         <tr>
           <td colSpan={5} className="px-6 pb-4 bg-gray-50">
             {tables === null ? (
@@ -311,43 +338,71 @@ function SourceRow({
                           <span className="text-gray-400"> · {t.rowCount.toLocaleString()} rows</span>
                           <span className="text-gray-500"> — {t.columns.map(c => c.name).join(", ")}</span>
                         </div>
-                        <button
-                          onClick={() => handleDropTable(t.name)}
-                          disabled={busy}
-                          className="text-gray-300 hover:text-red-600 disabled:opacity-40 shrink-0"
-                          title={`Drop "${t.name}"`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {isFiles && (
+                          <button
+                            onClick={() => handleDropTable(t.name)}
+                            disabled={busy}
+                            className="text-gray-300 hover:text-red-600 disabled:opacity-40 shrink-0"
+                            title={`Drop "${t.name}"`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
                 )}
 
-                <input
-                  ref={fileInput}
-                  type="file"
-                  multiple
-                  accept=".csv,.db,.sqlite,.sqlite3"
-                  className="hidden"
-                  onChange={e => handleAddFiles(e.target.files)}
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() => fileInput.current?.click()}
-                  className="flex items-center gap-1.5"
-                >
-                  {busy
-                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    : <FilePlus className="w-3.5 h-3.5" />}
-                  Add files
-                </Button>
-                <p className="text-xs text-gray-400 mt-1.5">
-                  A file whose name matches an existing table replaces it. Widgets built
-                  from this source won&apos;t change until you refresh them.
-                </p>
+                {isFiles && (
+                  <>
+                    <input
+                      ref={fileInput}
+                      type="file"
+                      multiple
+                      accept=".csv,.db,.sqlite,.sqlite3"
+                      className="hidden"
+                      onChange={e => handleAddFiles(e.target.files)}
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => fileInput.current?.click()}
+                      className="flex items-center gap-1.5"
+                    >
+                      {busy
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        : <FilePlus className="w-3.5 h-3.5" />}
+                      Add files
+                    </Button>
+                    <p className="text-xs text-gray-400 mt-1.5">
+                      A file whose name matches an existing table replaces it. Widgets built
+                      from this source won&apos;t change until you refresh them.
+                    </p>
+                  </>
+                )}
+
+                {isSheets && (
+                  <div className="flex items-center gap-3">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={handleSyncNow}
+                      className="flex items-center gap-1.5"
+                    >
+                      {busy
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        : <RefreshCw className="w-3.5 h-3.5" />}
+                      Sync now
+                    </Button>
+                    <span className="text-xs text-gray-400">
+                      {ds.lastSyncedAt
+                        ? `Last synced ${formatRelativeTime(ds.lastSyncedAt)}`
+                        : "Not synced yet"}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </td>
