@@ -28,6 +28,9 @@ export async function POST(
   if (source.type === "sheets") {
     await resyncSource(source)
     source = (await prisma.dataSource.findUnique({ where: { id: source.id } })) ?? source
+    if (source.status === "error" && source.syncError) {
+      return NextResponse.json({ error: source.syncError }, { status: 409 })
+    }
   }
 
   let result
