@@ -12,5 +12,9 @@ export function dataSourceToClient(row: DataSourceRow): DataSource {
     datafileId: row.datafileId ?? undefined,
     status: row.status as DataSource["status"],
     createdAt: row.createdAt.toISOString(),
+    ...(row.sheetId ? { sheetId: row.sheetId } : {}),
+    ...(row.type === "sheets" ? { refreshInterval: row.refreshInterval } : {}),
+    ...(row.lastSyncedAt ? { lastSyncedAt: row.lastSyncedAt.toISOString() } : {}),
+    ...(row.syncError ? { syncError: row.syncError } : {}),
   }
 }

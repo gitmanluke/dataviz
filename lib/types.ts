@@ -45,10 +45,15 @@ export interface DataSource {
   id: string
   name: string
   description?: string
-  type: string                 // "snowleopard" | "files"
+  type: string                 // "snowleopard" | "files" | "sheets"
   datafileId?: string          // snowleopard only
   status: "connected" | "error" | "verifying"
   createdAt: string  // ISO string
+  // sheets only
+  sheetId?: string
+  refreshInterval?: string     // manual | on-open | hourly | daily | weekly | monthly
+  lastSyncedAt?: string        // ISO string
+  syncError?: string
 }
 
 // Payload for creating a data source (POST /api/data-sources).
