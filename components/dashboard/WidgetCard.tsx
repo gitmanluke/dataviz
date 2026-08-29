@@ -9,6 +9,7 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
+import { toast } from "sonner"
 import { normalizeChartData, seriesLabel, compactNumber, truncateLabel } from "@/lib/widget-data"
 import { applySpec, type ChartView } from "@/lib/widget-spec"
 import { WidgetEditPanel } from "./WidgetEditPanel"
@@ -61,6 +62,9 @@ export function WidgetCard({ widget, onDelete, onDuplicate, onRename, onUpdateSp
     setRefreshing(true)
     try {
       await onRefresh()
+      toast.success("Data refreshed")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Refresh failed")
     } finally {
       setRefreshing(false)
     }
