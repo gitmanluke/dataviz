@@ -22,6 +22,7 @@ interface DashboardGridProps {
   onDuplicate: (id: string) => void
   onRename: (id: string, title: string) => void
   onUpdateSpec: (id: string, spec: WidgetSpec) => void
+  onRefresh: (id: string) => Promise<void>
   onLayoutChange: (newLayouts: LayoutItem[]) => void
 }
 
@@ -33,6 +34,7 @@ export function DashboardGrid({
   onDuplicate,
   onRename,
   onUpdateSpec,
+  onRefresh,
   onLayoutChange,
 }: DashboardGridProps) {
   const [gridWidth, setGridWidth] = useState(1200)
@@ -92,6 +94,7 @@ export function DashboardGrid({
               onDuplicate={() => { onDuplicate(widget.id); toast.success("Widget duplicated") }}
               onRename={(title) => onRename(widget.id, title)}
               onUpdateSpec={(spec) => onUpdateSpec(widget.id, spec)}
+              onRefresh={() => onRefresh(widget.id)}
             />
           </div>
         ))}

@@ -111,6 +111,29 @@ export function useWidgets(dashboardId: string) {
     }).catch(() => {})
   }, [])
 
+  // Re-run a widget's stored query and swap in the fresh rows.
+  const refresh = useCallback(async (id: string): Promise<void> => {
+    const res = await fetch(`/api/widgets/${id}/refresh`, { method: "POST" })
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string }
+      throw new Error(body.error ?? "Refresh failed")
+    }
+    const updated = (await res.json()) as Widget
+    setStore(prev => ({
+      ...prev,
+      widgets: prev.widgets.map(w => (w.id === id ? { ...w, data: updated.data } : w)),
+    }))
+  }, [])
+
+  const refreshAll = useCallback(async (): Promise<{ ok: number; failed: number }> => {
+    const targets = store.widgets.filter(w => w.query)
+    const results = await Promise.allSettled(targets.map(w => refresh(w.id)))
+    return {
+      ok: results.filter(r => r.status === "fulfilled").length,
+      failed: results.filter(r => r.status === "rejected").length,
+    }
+  }, [store.widgets, refresh])
+
   useEffect(() => {
     return () => {
       if (layoutTimer.current) clearTimeout(layoutTimer.current)
@@ -127,5 +150,7 @@ export function useWidgets(dashboardId: string) {
     updateLayouts,
     rename,
     updateSpec,
+    refresh,
+    refreshAll,
   }
 }

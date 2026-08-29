@@ -1,6 +1,6 @@
 "use client"
 
-import { MoreVertical, Copy, Trash2, GripVertical, Pencil, SlidersHorizontal } from "lucide-react"
+import { MoreVertical, Copy, Trash2, GripVertical, Pencil, SlidersHorizontal, RefreshCw } from "lucide-react"
 import { useState, useRef } from "react"
 import {
   DropdownMenu,
@@ -15,11 +15,12 @@ import { WidgetEditPanel } from "./WidgetEditPanel"
 import type { Widget, WidgetSpec } from "@/lib/types"
 
 interface WidgetCardProps {
-  widget: Pick<Widget, "id" | "type" | "title" | "data" | "spec">
+  widget: Pick<Widget, "id" | "type" | "title" | "data" | "spec" | "query">
   onDelete: () => void
   onDuplicate: () => void
   onRename: (title: string) => void
   onUpdateSpec: (spec: WidgetSpec) => void
+  onRefresh: () => Promise<void>
 }
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4']
@@ -48,12 +49,22 @@ function ChartFrame({ children }: { children: React.ReactElement }) {
   )
 }
 
-export function WidgetCard({ widget, onDelete, onDuplicate, onRename, onUpdateSpec }: WidgetCardProps) {
+export function WidgetCard({ widget, onDelete, onDuplicate, onRename, onUpdateSpec, onRefresh }: WidgetCardProps) {
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(widget.title)
   const [editOpen, setEditOpen] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const renameStartedAt = useRef(0)
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    try {
+      await onRefresh()
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   const startRename = () => {
     setRenameValue(widget.title)
@@ -278,6 +289,12 @@ export function WidgetCard({ widget, onDelete, onDuplicate, onRename, onUpdateSp
                 <SlidersHorizontal className="w-4 h-4 mr-2" />
                 Edit
               </DropdownMenuItem>
+              {widget.query && (
+                <DropdownMenuItem onSelect={() => handleRefresh()} disabled={refreshing}>
+                  <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+                  Refresh data
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onSelect={() => startRename()}>
                 <Pencil className="w-4 h-4 mr-2" />
                 Rename

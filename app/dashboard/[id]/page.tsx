@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { Settings, MessageSquare } from "lucide-react"
+import { Settings, MessageSquare, RefreshCw } from "lucide-react"
 import { DashboardSettings } from "@/components/dashboard/DashboardSettings"
 import { ChatPanel } from "@/components/dashboard/ChatPanel"
 import { DashboardGrid } from "@/components/dashboard/DashboardGrid"
@@ -20,7 +20,8 @@ export default function DashboardPage() {
   const [showSettings, setShowSettings] = useState(false)
   const [showChat, setShowChat] = useState(false)
 
-  const { widgets, layouts, initialized: widgetsInitialized, add, remove, duplicate, updateLayouts, rename, updateSpec } = useWidgets(dashboardId)
+  const { widgets, layouts, initialized: widgetsInitialized, add, remove, duplicate, updateLayouts, rename, updateSpec, refresh, refreshAll } = useWidgets(dashboardId)
+  const [refreshingAll, setRefreshingAll] = useState(false)
   const { dashboards, initialized: dashboardsInitialized, create, update, remove: removeDashboard, updateLastViewed } = useDashboards()
 
   const hasCreated = useRef(false)
@@ -51,6 +52,19 @@ export default function DashboardPage() {
   const handleAddWidget = (widget: Omit<Widget, "id">) => {
     add(widget)
     toast.success("Widget added to dashboard")
+  }
+
+  const refreshableCount = widgets.filter(w => w.query).length
+
+  const handleRefreshAll = async () => {
+    setRefreshingAll(true)
+    try {
+      const { ok, failed } = await refreshAll()
+      if (failed > 0) toast.error(`Refreshed ${ok}, ${failed} failed`)
+      else toast.success(ok === 1 ? "1 widget refreshed" : `${ok} widgets refreshed`)
+    } finally {
+      setRefreshingAll(false)
+    }
   }
 
   const handleSettingsUpdate = (changes: Partial<Dashboard>) => {
@@ -84,6 +98,16 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex items-center space-x-3">
+              {refreshableCount > 0 && (
+                <button
+                  onClick={handleRefreshAll}
+                  disabled={refreshingAll}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-60"
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${refreshingAll ? "animate-spin" : ""}`} />
+                  Refresh all
+                </button>
+              )}
               <button
                 onClick={() => setShowChat(!showChat)}
                 className={`inline-flex items-center px-4 py-2 rounded-md transition-colors ${
@@ -123,6 +147,7 @@ export default function DashboardPage() {
               onDuplicate={duplicate}
               onRename={rename}
               onUpdateSpec={updateSpec}
+              onRefresh={refresh}
               onLayoutChange={updateLayouts}
             />
           </div>
