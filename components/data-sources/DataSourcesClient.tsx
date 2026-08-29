@@ -14,6 +14,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select"
+import { REFRESH_INTERVALS } from "@/lib/integrations/google/intervals"
 import { useDataSources } from "@/hooks/useDataSources"
 import { GoogleSheetDialog } from "./GoogleSheetDialog"
 import type { DataSource } from "@/lib/types"
@@ -39,7 +43,7 @@ function formatRelativeTime(iso: string): string {
 }
 
 export function DataSourcesClient() {
-  const { dataSources, initialized, add, upload, addSheet, syncNow, remove } = useDataSources()
+  const { dataSources, initialized, add, upload, addSheet, update, syncNow, remove } = useDataSources()
   const [dialog, setDialog] = useState<"none" | "snowleopard" | "upload" | "sheets">("none")
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [googleConnected, setGoogleConnected] = useState(false)
@@ -136,6 +140,7 @@ export function DataSourcesClient() {
                   onCancelDelete={() => setConfirmDeleteId(null)}
                   onConfirmDelete={() => handleDelete(ds.id)}
                   onSync={() => syncNow(ds.id)}
+                  onSetInterval={v => update(ds.id, { refreshInterval: v })}
                 />
               ))}
             </tbody>
@@ -166,7 +171,7 @@ export function DataSourcesClient() {
 // --- row -----------------------------------------------------------------
 
 function SourceRow({
-  ds, confirmingDelete, onAskDelete, onCancelDelete, onConfirmDelete, onSync,
+  ds, confirmingDelete, onAskDelete, onCancelDelete, onConfirmDelete, onSync, onSetInterval,
 }: {
   ds: DataSource
   confirmingDelete: boolean
@@ -174,6 +179,7 @@ function SourceRow({
   onCancelDelete: () => void
   onConfirmDelete: () => void
   onSync: () => Promise<void>
+  onSetInterval: (value: string) => Promise<void>
 }) {
   const [expanded, setExpanded] = useState(false)
   const [tables, setTables] = useState<TableInfo[] | null>(null)
@@ -383,7 +389,7 @@ function SourceRow({
                 )}
 
                 {isSheets && (
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
                     <Button
                       size="sm"
                       variant="outline"
@@ -396,6 +402,21 @@ function SourceRow({
                         : <RefreshCw className="w-3.5 h-3.5" />}
                       Sync now
                     </Button>
+                    <Select
+                      value={ds.refreshInterval ?? "manual"}
+                      onValueChange={v => {
+                        void onSetInterval(v).catch(() => toast.error("Could not change the interval"))
+                      }}
+                    >
+                      <SelectTrigger className="h-8 w-56 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {REFRESH_INTERVALS.map(o => (
+                          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <span className="text-xs text-gray-400">
                       {ds.lastSyncedAt
                         ? `Last synced ${formatRelativeTime(ds.lastSyncedAt)}`

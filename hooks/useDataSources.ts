@@ -77,6 +77,21 @@ export function useDataSources() {
     [],
   )
 
+  // Renames a source or changes a sheets source's refresh interval.
+  const update = useCallback(
+    async (id: string, changes: { name?: string; refreshInterval?: string }): Promise<void> => {
+      const res = await fetch(`/api/data-sources/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(changes),
+      })
+      if (!res.ok) throw new Error(await readError(res))
+      const updated = (await res.json()) as DataSource
+      setDataSources(prev => prev.map(ds => (ds.id === id ? { ...ds, ...updated } : ds)))
+    },
+    [],
+  )
+
   // Pulls the latest from Google for a sheets source. Throws on failure.
   const syncNow = useCallback(async (id: string): Promise<void> => {
     const res = await fetch(`/api/data-sources/${id}/sync`, { method: "POST" })
@@ -91,5 +106,5 @@ export function useDataSources() {
     setDataSources(prev => prev.filter(ds => ds.id !== id))
   }, [])
 
-  return { dataSources, initialized, add, upload, addSheet, syncNow, remove }
+  return { dataSources, initialized, add, upload, addSheet, update, syncNow, remove }
 }

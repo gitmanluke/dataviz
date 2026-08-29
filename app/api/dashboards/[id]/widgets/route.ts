@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { widgetToClient, defaultSizeFor } from "@/lib/dashboards"
+import { syncDueSheets } from "@/lib/integrations/google/sync"
 import type { LayoutItem, Widget } from "@/lib/types"
 
 // GET /api/dashboards/:id/widgets -> { widgets, layouts }
@@ -9,6 +10,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
+
+  // Opportunistic Google Sheets refresh — bounded so a slow sync can't hang the
+  // dashboard load (it finishes in the background for next time).
+  await syncDueSheets({ dashboardId: id, timeoutMs: 8000 })
+
   const rows = await prisma.widget.findMany({
     where: { dashboardId: id },
     orderBy: { createdAt: "asc" },

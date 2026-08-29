@@ -3,11 +3,13 @@ import { prisma } from "@/lib/db"
 import { encryptSecret } from "@/lib/crypto"
 import { verifyConnection } from "@/lib/snowleopard"
 import { dataSourceToClient } from "@/lib/data-sources"
+import { syncDueSheets } from "@/lib/integrations/google/sync"
 import type { NewDataSource } from "@/lib/types"
 
 const toClient = dataSourceToClient
 
 export async function GET() {
+  void syncDueSheets().catch(() => {})
   const rows = await prisma.dataSource.findMany({ orderBy: { createdAt: "desc" } })
   return NextResponse.json(rows.map(toClient))
 }
