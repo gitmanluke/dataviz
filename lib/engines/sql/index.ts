@@ -1,5 +1,6 @@
 import "server-only"
 import type Database from "better-sqlite3"
+import type { DataSource as DataSourceRow } from "@prisma/client"
 import { QueryError, type QueryEngine, type QueryResult } from "@/lib/query-engine"
 import { STORE_ROW_CAP } from "@/lib/widget-spec"
 import { getAnthropicKey } from "@/lib/settings"
@@ -58,17 +59,33 @@ export const sqlEngine: QueryEngine = {
         }
       }
 
-      const all = db.prepare(gen.sql).all() as Array<Record<string, unknown>>
-      const rows = all.slice(0, STORE_ROW_CAP)
-      return {
-        rows,
-        columns: inferColumns(rows),
-        sql: gen.sql,
-        explanation: gen.summary || null,
-        truncated: all.length > rows.length,
-      }
+      return runValidated(db, gen.sql, gen.summary || null)
     } finally {
       db.close()
     }
   },
+}
+
+function runValidated(db: Database.Database, sql: string, explanation: string | null): QueryResult {
+  const all = db.prepare(sql).all() as Array<Record<string, unknown>>
+  const rows = all.slice(0, STORE_ROW_CAP)
+  return { rows, columns: inferColumns(rows), sql, explanation, truncated: all.length > rows.length }
+}
+
+/**
+ * Re-run a stored SQL query against a file source — no LLM. Used to refresh a
+ * widget whose underlying data may have changed.
+ */
+export async function runSql(sql: string, source: DataSourceRow): Promise<QueryResult> {
+  if (source.type !== "files" || !sourceDbExists(source.id)) {
+    throw new QueryError("This data source can't be queried directly.", 400)
+  }
+  const db = openReadonly(source.id)
+  try {
+    const check = validateSql(sql, db)
+    if (!check.ok) throw new QueryError(`Query rejected: ${check.reason}`)
+    return runValidated(db, sql, null)
+  } finally {
+    db.close()
+  }
 }
