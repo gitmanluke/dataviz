@@ -17,10 +17,11 @@ Primary goal right now: a clean, working portfolio piece.
 - Next.js 16 (App Router) + React 19 + TypeScript (strict)
 - Tailwind CSS 4, shadcn/ui (components in `components/ui/` — vendored, don't hand-edit)
 - recharts (charts), react-grid-layout (dashboard grid), sonner (toasts)
-- Data layer: two `QueryEngine`s picked by `DataSource.type` —
-  `sqlEngine` (uploaded CSV / `.db` files → per-source SQLite → NL→SQL via
-  Claude, ported from the SpeedySheets project) and `snowLeopardEngine`
-  (`@snowleopard-ai/client`)
+- Data layer: `QueryEngine` picked by `DataSource.type` — `snowLeopardEngine`
+  (`@snowleopard-ai/client`) for `snowleopard`, else `sqlEngine` (per-source
+  SQLite → NL→SQL via Claude, ported from SpeedySheets). `files` = uploaded
+  CSV / `.db`; `sheets` = a Google spreadsheet synced tab-by-tab into the same
+  per-source SQLite DB (`lib/integrations/google/*`, see `docs/google-sheets.md`)
 - Viz layer: Claude Haiku (`@anthropic-ai/sdk`) behind a `VizModel`, with the
   `detectSpec` heuristic as the always-available fallback
 - SQLite: Prisma 6 for **app data**; `better-sqlite3` for **uploaded user data**
@@ -38,10 +39,11 @@ xKey / series / sort) in `spec`. `WidgetCard` renders `applySpec(data, spec)`.
 The edit panel writes `spec` straight to `PATCH /api/widgets/[id]` — no agent
 call.
 
-A widget from a `files` source also stores the `query` (+ `dataSourceId`) that
-produced its rows. `POST /api/widgets/[id]/refresh` re-runs that SQL via
-`runSql` and swaps in fresh rows — surfaced as "Refresh data" per widget and
-"Refresh all" on the dashboard. SnowLeopard widgets have no re-runnable SQL, so
+A widget from a `files` or `sheets` source also stores the `query` (+
+`dataSourceId`) that produced its rows. `POST /api/widgets/[id]/refresh` re-runs
+that SQL via `runSql` and swaps in fresh rows (for `sheets`, it re-pulls from
+Google first) — surfaced as "Refresh data" per widget and "Refresh all" on the
+dashboard. SnowLeopard widgets have no re-runnable SQL, so
 they get no `query` and no refresh control.
 
 ## Layout
@@ -62,8 +64,14 @@ they get no `query` and no refresh control.
   refresh; `tables.ts` has `readTables` / `dropTable`),
   `data-sources.ts` (row → client), `widget-detector.ts` (`detectSpec`, pure),
   `widget-spec.ts` (`applySpec`, pure), `widget-data.ts` (chart helpers, pure),
-  `dashboards.ts`, `types.ts`. Files that touch the DB, fs, or an API key import
-  `"server-only"`; the pure `sql/{validator,ingest}.ts` stay importable by Vitest.
+  `dashboards.ts`, `types.ts`. `integrations/google/*` — the Sheets source:
+  `auth`/`token` (OAuth + encrypted `Setting` rows + access-token cache),
+  `rest`, `sheets` (`parseSpreadsheet`/`syncSheet`), `sync` (`isDue`/
+  `resyncSource`/`syncDueSheets`), `ids`, `intervals` (client-safe).
+  `lib/picker/load.ts` loads the Drive Picker script. Files that touch the DB,
+  fs, or an API key import `"server-only"`; pure modules
+  (`sql/{validator,ingest}`, `google/{token,ids,intervals}`,
+  `google/sheets` `parseSpreadsheet`) stay importable by Vitest.
 - `prisma/` — `schema.prisma` and committed `migrations/`. `dev.db` is gitignored.
 - `pydantic-ai/` — standalone Python example, not part of the web app.
 
@@ -79,7 +87,7 @@ they get no `query` and no refresh control.
 
 Requires `.env` (copy `.env.example`) with `DATABASE_URL` and a generated
 `DATA_SOURCE_ENCRYPTION_KEY`. `ANTHROPIC_API_KEY` is optional (or set it at
-`/settings`). No test or typecheck script yet (see VISION).
+`/settings`). Google Sheets credentials are configured at `/settings`.
 
 ## Conventions
 
@@ -96,9 +104,14 @@ Requires `.env` (copy `.env.example`) with `DATABASE_URL` and a generated
 - Secrets never reach the client. API keys are encrypted at rest in the DB
   (`lib/crypto.ts`); route handlers decrypt them; the client sends a
   `dataSourceId`, never a key. Keep it that way for any new data engine.
-- Don't build fake UI. If a feature isn't wired, don't ship a control for it
-  (the alert toggles and refresh-interval in `DashboardSettings` are existing
-  examples to fix or cut).
+  **One deliberate exception:** `GET /api/integrations/google/token` returns a
+  short-lived, read-only Google access token to the browser because the Drive
+  Picker is a browser-only widget with no server-side mode. The long-lived
+  refresh token stays encrypted server-side. Don't widen this.
+- Don't build fake UI. If a feature isn't wired, don't ship a control for it.
+  `DashboardSettings` still has fake alert toggles and a fake dashboard-wide
+  refresh-interval (now superseded by the per-source `refreshInterval` on
+  `sheets` sources) — cut them in the cleanup pass.
 
 ## Next.js 16
 

@@ -41,8 +41,16 @@ The core loop already works:
   source's tables can be added to / replaced / dropped from `/data-sources`;
   widgets from a `files` source store their `query` + `dataSourceId` and can be
   re-run (per-widget "Refresh data", dashboard "Refresh all") — manual only.
-- **Vitest** exists (`npm run test`) — 58 tests on the SQL validator, ingestion,
-  `runSql`, and table management.
+- **Google Sheets** (`feat/google-sheets`): connect a spreadsheet via the Drive
+  Picker (Desktop OAuth, loopback, PKCE, `drive.file` scope). Each tab → a
+  table; the same `sqlEngine` / `runSql` / widget-refresh path as `files`. A
+  per-source `refreshInterval` (`manual`…`monthly`) re-syncs opportunistically
+  on app activity, gated by a Drive `modifiedTime` check. Credentials +
+  encrypted refresh token in `Setting` rows; only a short-lived read-only
+  access token reaches the browser (for the Picker).
+- **Vitest** exists (`npm run test`) — 82 tests: SQL validator, ingestion,
+  `runSql`, table management, and the Google integration (token cache,
+  `parseSpreadsheet`/`syncSheet`, `isDue`, id parsing).
 - **Builds clean.** `npm run build` passes (Next 16, Turbopack), TypeScript OK.
 - **`npm install` works with no flags.** 3 `npm audit` warnings remain, all
   cleared by a `next` 16.2.1 → 16.3.x bump (not yet done).
@@ -129,7 +137,12 @@ split and "agent skills" scaffolding add friction with no payoff here).
   Multi-file → multi-table → joins. Tables are managed from the expanded row
   on `/data-sources`: **Add files** (`POST …/files`; a same-named file
   replaces its table) and a per-table drop (`DELETE …/tables/[name]`).
-- Later: `sheets` (Google Sheet + a `refreshInterval`), `postgres`.
+- `sheets` — a Google spreadsheet, one table per tab, in the same per-source
+  SQLite DB. `lib/integrations/google/*` — Desktop OAuth (loopback, PKCE,
+  `drive.file`), the Drive Picker, `syncSheet` (batchGet → `createTable`),
+  `resyncSource` / `syncDueSheets` (opportunistic, `modifiedTime`-gated), a
+  per-source `refreshInterval`. See `docs/google-sheets.md`.
+- Later: `postgres`.
 
 A bundled zero-setup sample is a follow-up.
 
@@ -183,10 +196,14 @@ hard-code it.
    (`feat/sql-engine`).
 6. ~~**Table management + refreshable widgets**~~ Done (`feat/widget-refresh`):
    add/replace/drop tables on a `files` source; widgets store `query` +
-   `dataSourceId` and re-run on demand. Next: Google Sheets (`type: "sheets"`,
-   Desktop OAuth over loopback, `refreshInterval`).
-7. **Cleanup pass:** remove fake UI, add `typecheck`/`test` scripts + Vitest +
-   CI, write the README.
+   `dataSourceId` and re-run on demand.
+7. ~~**Google Sheets** (`type: "sheets"`)~~ Done (`feat/google-sheets`):
+   Desktop OAuth (loopback, PKCE, `drive.file`), Drive Picker, `syncSheet`,
+   per-source `refreshInterval` enforced opportunistically. See
+   `docs/google-sheets.md`.
+8. **Cleanup pass:** cut SnowLeopard; remove the remaining fake UI (the
+   `DashboardSettings` alert toggles + its now-superseded refresh-interval
+   selector); a bundled zero-setup sample; CI; the README.
 
 ### Widget system rework — done (`feat/widget-system`)
 
@@ -229,6 +246,27 @@ All five points landed as one commit each, plus a menu fix:
    `POST /api/data-sources/[id]/files` (a same-named file replaces its table),
    `DELETE /api/data-sources/[id]/tables/[table]`, both surfaced in the
    expanded `SourceRow` on `/data-sources`.
+
+### Google Sheets — done (`feat/google-sheets`)
+
+1. `DataSource` gains `sheetId` / `sheetModifiedAt` / `lastSyncedAt` /
+   `refreshInterval` / `syncError`. `lib/integrations/google/*`: `auth`+`token`
+   (OAuth client, encrypted `Setting` rows, in-memory access-token cache),
+   `rest` (Sheets/Drive GET), `sheets` (`parseSpreadsheet` + `syncSheet`),
+   `sync` (`isDue` / `resyncSource` / `syncDueSheets`), `ids`, `intervals`.
+2. OAuth loopback: `/api/integrations/google/{start,callback,credentials,token}`
+   + a status/disconnect handler. PKCE verifier/state in a short-lived httpOnly
+   cookie. Scope `drive.file` (non-sensitive → consent screen can be
+   "production" → refresh tokens don't expire).
+3. Drive Picker (`lib/picker/load.ts` + `GoogleSheetDialog`) — the one place a
+   Google token (short-lived, read-only) reaches the client.
+   `POST /api/data-sources/sheets` validates via Drive, creates, `syncSheet`s,
+   rolls back on failure.
+4. `runSql` / `/api/ai/widget` / widget-refresh treat `sheets` like `files`.
+   Sheets widget refresh re-pulls from Google first. `POST …/[id]/sync` +
+   "Sync now"; interval `Select` via `PATCH …/[id]`. `syncDueSheets` runs
+   (bounded) from the dashboard-widgets GET and (background) from data-sources
+   GET.
 
 ## "v1 done" checklist
 
