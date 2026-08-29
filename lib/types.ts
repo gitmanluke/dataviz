@@ -25,6 +25,8 @@ export interface Widget {
   title: string
   data: unknown        // raw query rows (Record<string, unknown>[]); legacy widgets store collapsed chart data
   spec?: WidgetSpec
+  query?: string        // the SQL that produced `data` — present ⇒ widget can be refreshed
+  dataSourceId?: string
 }
 
 export interface LayoutItem {

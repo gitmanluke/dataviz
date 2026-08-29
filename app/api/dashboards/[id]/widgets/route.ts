@@ -50,6 +50,15 @@ export async function POST(
   const nextY = existing.reduce((max, w) => Math.max(max, w.y + w.h), 0)
   const size = defaultSizeFor(body.type)
 
+  // A widget can be refreshed only when it came from a file source (its SQL is
+  // re-runnable). SnowLeopard SQL can't be re-run, so drop the query for those.
+  let query: string | null = null
+  const dataSourceId = body.dataSourceId ?? null
+  if (body.query && dataSourceId) {
+    const src = await prisma.dataSource.findUnique({ where: { id: dataSourceId } })
+    if (src?.type === "files") query = body.query
+  }
+
   const row = await prisma.widget.create({
     data: {
       dashboardId: id,
@@ -57,6 +66,8 @@ export async function POST(
       title: body.title,
       data: JSON.stringify(body.data ?? null),
       spec: body.spec ? JSON.stringify(body.spec) : null,
+      query,
+      dataSourceId,
       x: 0,
       y: nextY,
       ...size,

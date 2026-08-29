@@ -19,6 +19,7 @@ model DataSource {
   apiKeyCipher String? // snowleopard only — AES-256-GCM (lib/crypto.ts), never sent to the client
   status       String   @default("connected")
   createdAt    DateTime @default(now())
+  widgets      Widget[]
 }
 
 model Setting {
@@ -44,6 +45,10 @@ model Widget {
   title       String
   data        String    @default("null") // JSON-serialized raw query rows
   spec        String? // JSON-serialized WidgetSpec (how to render `data`)
+  // provenance — lets the widget be re-run against its source (file sources only)
+  query        String?
+  dataSourceId String?
+  dataSource   DataSource? @relation(fields: [dataSourceId], references: [id], onDelete: SetNull)
   // react-grid-layout position/size
   x           Int       @default(0)
   y           Int       @default(0)

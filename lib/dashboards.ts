@@ -32,6 +32,8 @@ export function widgetToClient(row: WidgetRow): { widget: Widget; layout: Layout
       title: row.title,
       data: safeParse(row.data),
       ...(row.spec ? { spec: safeParse(row.spec) as WidgetSpec } : {}),
+      ...(row.query ? { query: row.query } : {}),
+      ...(row.dataSourceId ? { dataSourceId: row.dataSourceId } : {}),
     },
     layout: {
       i: row.id,

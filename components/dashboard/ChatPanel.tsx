@@ -243,6 +243,8 @@ export function ChatPanel({ onClose, onAddWidget }: ChatPanelProps) {
                           title: msg.widget!.spec.title,
                           data: msg.widget!.rows,
                           spec: msg.widget!.spec,
+                          query: msg.widget!.sql,
+                          dataSourceId: selectedSource?.id,
                         })}
                         className="w-full text-xs bg-blue-600 text-white rounded-lg py-1.5 hover:bg-blue-700 transition-colors font-medium"
                       >
