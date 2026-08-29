@@ -29,6 +29,12 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    if (!source.apiKeyCipher || !source.datafileId) {
+      return new Response(JSON.stringify({ error: "Not a SnowLeopard data source" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      })
+    }
     const client = createSnowLeopardClient(decryptSecret(source.apiKeyCipher))
     const datafileId = source.datafileId
 

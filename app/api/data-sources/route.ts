@@ -2,28 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { encryptSecret } from "@/lib/crypto"
 import { verifyConnection } from "@/lib/snowleopard"
-import type { DataSource, NewDataSource } from "@/lib/types"
+import { dataSourceToClient } from "@/lib/data-sources"
+import type { NewDataSource } from "@/lib/types"
 
-// Shape a DB row into the client-safe DataSource (drops apiKeyCipher).
-function toClient(row: {
-  id: string
-  name: string
-  description: string | null
-  type: string
-  datafileId: string
-  status: string
-  createdAt: Date
-}): DataSource {
-  return {
-    id: row.id,
-    name: row.name,
-    description: row.description ?? undefined,
-    type: row.type,
-    datafileId: row.datafileId,
-    status: row.status as DataSource["status"],
-    createdAt: row.createdAt.toISOString(),
-  }
-}
+const toClient = dataSourceToClient
 
 export async function GET() {
   const rows = await prisma.dataSource.findMany({ orderBy: { createdAt: "desc" } })

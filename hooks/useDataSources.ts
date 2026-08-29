@@ -47,11 +47,20 @@ export function useDataSources() {
     return created
   }, [])
 
+  // Uploads CSV/.db files as a new "files" data source. Throws on failure.
+  const upload = useCallback(async (form: FormData): Promise<DataSource> => {
+    const res = await fetch("/api/data-sources/upload", { method: "POST", body: form })
+    if (!res.ok) throw new Error(await readError(res))
+    const created = (await res.json()) as DataSource
+    setDataSources(prev => [created, ...prev])
+    return created
+  }, [])
+
   const remove = useCallback(async (id: string): Promise<void> => {
     const res = await fetch(`/api/data-sources/${id}`, { method: "DELETE" })
     if (!res.ok && res.status !== 404) throw new Error(await readError(res))
     setDataSources(prev => prev.filter(ds => ds.id !== id))
   }, [])
 
-  return { dataSources, initialized, add, remove }
+  return { dataSources, initialized, add, upload, remove }
 }

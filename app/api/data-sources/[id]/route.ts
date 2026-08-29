@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/db"
+import { removeSourceDb } from "@/lib/engines/sql/store"
 
 export async function DELETE(
   _request: Request,
@@ -10,6 +11,7 @@ export async function DELETE(
 
   try {
     await prisma.dataSource.delete({ where: { id } })
+    removeSourceDb(id)
   } catch (error) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&

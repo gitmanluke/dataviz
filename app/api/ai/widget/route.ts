@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { snowLeopardEngine } from "@/lib/engines/snowleopard"
+import { sqlEngine } from "@/lib/engines/sql"
 import { QueryError } from "@/lib/query-engine"
 import { resolveSpec } from "@/lib/viz"
 import type { WidgetSpec } from "@/lib/types"
@@ -28,9 +29,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Data source not found" }, { status: 404 })
     }
 
+    const engine = source.type === "files" ? sqlEngine : snowLeopardEngine
     let result
     try {
-      result = await snowLeopardEngine.retrieve(userQuery, source)
+      result = await engine.retrieve(userQuery, source)
     } catch (error) {
       if (error instanceof QueryError) {
         return NextResponse.json({ error: error.message }, { status: error.status })

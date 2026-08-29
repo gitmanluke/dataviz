@@ -43,8 +43,8 @@ export interface DataSource {
   id: string
   name: string
   description?: string
-  type: string
-  datafileId: string
+  type: string                 // "snowleopard" | "files"
+  datafileId?: string          // snowleopard only
   status: "connected" | "error" | "verifying"
   createdAt: string  // ISO string
 }

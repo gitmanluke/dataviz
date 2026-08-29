@@ -9,6 +9,9 @@ import { inferColumns } from "@/lib/engines/columns"
 
 export const snowLeopardEngine: QueryEngine = {
   async retrieve(userQuery: string, source: DataSourceRow): Promise<QueryResult> {
+    if (!source.apiKeyCipher || !source.datafileId) {
+      throw new QueryError("This SnowLeopard data source is misconfigured.", 400)
+    }
     const client = createSnowLeopardClient(decryptSecret(source.apiKeyCipher))
     try {
       const result = await client.retrieve({ userQuery, datafileId: source.datafileId })
