@@ -23,19 +23,21 @@ The core loop already works:
    from the returned rows; you preview it and add it to the grid.
 4. Dashboards, widgets, and layouts persist (localStorage today).
 
-## Where it stands (updated 2026-08-27)
+## Where it stands (updated 2026-08-29)
 
 - **All app data persists in local SQLite via Prisma 6** — data sources,
-  dashboards, widgets, settings. `lib/store.ts` is gone. One-time localStorage
-  import via `MigrationGate` + `/api/migrate` (idempotent).
-- **Secrets** (SnowLeopard + Anthropic keys) are encrypted at rest
-  (`lib/crypto.ts`) and never leave the server.
-- **Widget system** (`feat/widget-system`): heuristic detector rebuilt around a
-  `{ rows, xKey, series }` contract; intent-driven type; chat follow-ups.
-- **Viz agent** (`feat/viz-agent`, current): widgets store raw rows + an
-  editable `WidgetSpec`; `QueryEngine` boundary over SnowLeopard; `ClaudeVizModel`
-  (Haiku) picks the spec when an Anthropic key is set, `detectSpec` heuristic
-  otherwise; `/settings` page for the key; per-widget edit panel.
+  dashboards, widgets, settings. One-time localStorage import via `MigrationGate`.
+- **Secrets** (SnowLeopard + Anthropic keys) encrypted at rest (`lib/crypto.ts`),
+  never leave the server.
+- **Widget system + viz agent** (merged): widgets store raw rows + an editable
+  `WidgetSpec`; `ClaudeVizModel` (Haiku) picks the spec when an Anthropic key is
+  set, `detectSpec` heuristic otherwise; `/settings` page; per-widget edit panel.
+- **CSV / SQLite data sources** (`feat/sql-engine`): upload `.csv` / `.db` files
+  → per-source SQLite (`data/sources/*.db`) → `sqlEngine` (Claude writes SQL →
+  `validateSql` + retry → run read-only via `better-sqlite3`). The pipeline is a
+  TS port of the hardened SpeedySheets project. SnowLeopard stays as a second
+  engine, picked by `DataSource.type`.
+- **Vitest** exists (`npm run test`) — 47 tests on the SQL validator + ingestion.
 - **Builds clean.** `npm run build` passes (Next 16, Turbopack), TypeScript OK.
 - **`npm install` works with no flags.** 3 `npm audit` warnings remain, all
   cleared by a `next` 16.2.1 → 16.3.x bump (not yet done).
@@ -86,10 +88,17 @@ split and "agent skills" scaffolding add friction with no payoff here).
 ### Retrieval → pluggable engine — done
 
 - `QueryEngine.retrieve(query, source) → { rows, columns:[{name,type}], sql,
-  explanation, truncated }` (`lib/query-engine.ts`); `snowLeopardEngine` is the
-  only impl. Column types inferred from sample values.
-- `/api/ai/widget` is the adapter: engine → `resolveSpec` → `{ spec, rows }`.
-- Later: `SqlEngine` (direct SQL, no NL step) for a `sqlite`/`postgres` source.
+  explanation, truncated }` (`lib/query-engine.ts`). `/api/ai/widget` picks the
+  impl by `source.type`, then `resolveSpec` → `{ spec, rows }`.
+- **`snowLeopardEngine`** — hosted NL→data.
+- **`sqlEngine`** (`lib/engines/sql/*`) — uploaded CSV/`.db` → per-source SQLite
+  (`data/sources/<id>.db`, `better-sqlite3`) → Claude writes one SELECT →
+  `validateSql` (keyword/function scan + `.prepare()` + `stmt.reader`) → one
+  retry with the failure reason → run on a `{ readonly: true }` connection.
+  Ported + hardened from the SpeedySheets CLI project.
+- **Deferred:** "Run SQL directly" mode (`/api/ai/sql` + a chat toggle) so file
+  sources work with no Anthropic key; `Widget.query` persistence + live re-run;
+  cutting SnowLeopard; a Postgres engine.
 
 ### Viz agent → pluggable model — done
 
@@ -103,18 +112,17 @@ split and "agent skills" scaffolding add friction with no payoff here).
 
 ### Data sources → typed connections
 
-A data source is `{ id, name, type, config }`. The `DataSource` model already has
-a `type` column (defaults to `snowleopard`); today `datafileId` + encrypted
-`apiKeyCipher` are explicit columns. When a second type lands, move the
-type-specific fields into a JSON `config` column.
+`DataSource.type` picks the engine. `datafileId` / `apiKeyCipher` are nullable
+(SnowLeopard only).
 
-- `snowleopard` — `{ apiKey, datafileId }` (today)
-- `sqlite` — `{ path }` (natural for a local app; the Snow Leopard sample
-  dataset is itself a `.db` file)
-- `csv` — uploaded file loaded into a local table
-- `postgres` — connection string (later, if ever)
+- `snowleopard` — `{ apiKey, datafileId }`
+- `files` — one or more uploaded `.csv` / `.db` files, ingested into
+  `data/sources/<id>.db` (one table per file / per source-db table).
+  Multi-file → multi-table → joins.
+- Later: `sheets` (Google Sheet + a `refreshInterval`), `postgres`.
 
-MVP ships `snowleopard` plus one bundled sample so the app works with no signup.
+Table management on a `files` source (add / replace / remove a file) and a
+bundled zero-setup sample are follow-ups.
 
 ### Secrets — done
 
@@ -196,15 +204,16 @@ All five points landed as one commit each, plus a menu fix:
 
 - [x] Secrets server-side only (encrypted at rest)
 - [x] SQLite persistence — data sources, dashboards, widgets, settings
-- [x] `QueryEngine` abstraction; SnowLeopard behind it
+- [x] `QueryEngine` abstraction; SnowLeopard + `sqlEngine` behind it
 - [x] LLM viz agent (Claude Haiku) with a heuristic + edit-panel floor
-- [ ] One bundled zero-setup data source (sample SQLite), with matching
+- [x] Own NL→SQL data engine — CSV / `.db` upload, no vendor dependency
+- [ ] One bundled zero-setup data source (sample CSV/SQLite), with matching
       example prompts in `ChatPanel`
-- [x] NL-query → widget flow (agent + heuristic + editable spec); the bundled
-      sample would still let a reviewer exercise it with no signup
-- [ ] Remove dead/fake UI (alert toggles, non-functional refresh interval)
-- [ ] `npm run typecheck` + `npm run test` scripts; Vitest on `widget-detector`
-      and route handlers; CI running lint + typecheck + test + build
+- [x] NL-query → widget flow (agent + heuristic + editable spec)
+- [ ] Remove dead/fake UI (alert toggles, non-functional refresh interval,
+      dead `AddWidgetModal`, unused `/api/ai/chat`)
+- [~] `npm run typecheck` + `npm run test` exist; Vitest covers the SQL engine —
+      still want `widget-detector` / route coverage + CI
 - [ ] README: what it is, screenshots/GIF, one-command run, short architecture note
 - [ ] Deployed demo (Vercel) or a documented one-command local run
 - [ ] Preserve the Figma design link:

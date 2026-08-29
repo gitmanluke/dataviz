@@ -17,20 +17,26 @@ Primary goal right now: a clean, working portfolio piece.
 - Next.js 16 (App Router) + React 19 + TypeScript (strict)
 - Tailwind CSS 4, shadcn/ui (components in `components/ui/` — vendored, don't hand-edit)
 - recharts (charts), react-grid-layout (dashboard grid), sonner (toasts)
-- Data layer: SnowLeopard (`@snowleopard-ai/client`) behind a `QueryEngine`
+- Data layer: two `QueryEngine`s picked by `DataSource.type` —
+  `sqlEngine` (uploaded CSV / `.db` files → per-source SQLite → NL→SQL via
+  Claude, ported from the SpeedySheets project) and `snowLeopardEngine`
+  (`@snowleopard-ai/client`)
 - Viz layer: Claude Haiku (`@anthropic-ai/sdk`) behind a `VizModel`, with the
   `detectSpec` heuristic as the always-available fallback
-- Persistence: **all app data** (data sources, dashboards, widgets, settings) →
-  local SQLite via Prisma 6. No localStorage for app state.
+- SQLite: Prisma 6 for **app data**; `better-sqlite3` for **uploaded user data**
+  (`data/sources/<id>.db`, gitignored). `papaparse` for CSV.
+- No localStorage for app state.
 
 ## How a widget is made
 
-`ChatPanel` → `POST /api/ai/widget` → `snowLeopardEngine.retrieve()` (rows +
-inferred column types) → `resolveSpec()` (`ClaudeVizModel` if an Anthropic key
-is set, else `detectSpec`) → `{ spec, rows }`. The widget stores the **raw
-rows** in `data` and a `WidgetSpec` (type / xKey / series / sort) in `spec`.
-`WidgetCard` renders `applySpec(data, spec)`. The edit panel writes `spec`
-straight to `PATCH /api/widgets/[id]` — no agent call.
+`ChatPanel` → `POST /api/ai/widget` → engine `.retrieve()` (→ rows + inferred
+column types; the SQL engine has Claude write a SELECT, then `validateSql` +
+one retry, then runs it on a `{ readonly: true }` connection) → `resolveSpec()`
+(`ClaudeVizModel` if an Anthropic key is set, else `detectSpec`) → `{ spec,
+rows }`. The widget stores the **raw rows** in `data` and a `WidgetSpec` (type /
+xKey / series / sort) in `spec`. `WidgetCard` renders `applySpec(data, spec)`.
+The edit panel writes `spec` straight to `PATCH /api/widgets/[id]` — no agent
+call.
 
 ## Layout
 
@@ -43,10 +49,12 @@ straight to `PATCH /api/widgets/[id]` — no agent call.
   `/api/ai/widget`. Components go through these and never `fetch` for data directly.
 - `lib/` — `db.ts` (Prisma singleton), `crypto.ts` (AES-256-GCM secrets),
   `settings.ts` (`getAnthropicKey`), `anthropic.ts` / `viz/*` (the viz agent),
-  `query-engine.ts` / `engines/*` (data), `widget-detector.ts` (`detectSpec`
-  heuristic, pure), `widget-spec.ts` (`applySpec`, pure), `widget-data.ts`
-  (chart helpers, pure), `dashboards.ts` (row → client), `types.ts`. Files that
-  touch the DB or an API key import `"server-only"`.
+  `query-engine.ts` + `engines/*` (data: `columns.ts` shared inference,
+  `snowleopard.ts`, `sql/{store,validator,ingest,ingest-files,nl-to-sql,index}.ts`),
+  `data-sources.ts` (row → client), `widget-detector.ts` (`detectSpec`, pure),
+  `widget-spec.ts` (`applySpec`, pure), `widget-data.ts` (chart helpers, pure),
+  `dashboards.ts`, `types.ts`. Files that touch the DB, fs, or an API key import
+  `"server-only"`; the pure `sql/{validator,ingest}.ts` stay importable by Vitest.
 - `prisma/` — `schema.prisma` and committed `migrations/`. `dev.db` is gitignored.
 - `pydantic-ai/` — standalone Python example, not part of the web app.
 
@@ -56,6 +64,7 @@ straight to `PATCH /api/widgets/[id]` — no agent call.
   fall back to 3001, or use `PORT=3100 npm run dev`)
 - `npm run build` — production build; run this before claiming a change compiles
 - `npm run lint` — eslint
+- `npm run test` — Vitest (`lib/**/*.test.ts`); `npm run typecheck` — `tsc --noEmit`
 - `npm run db:migrate` — create/apply a Prisma migration after editing the schema
 - `npm run db:studio` — browse the local DB
 
