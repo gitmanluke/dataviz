@@ -3,19 +3,9 @@ import type { SchemaData, RetrieveResponse } from "@snowleopard-ai/client"
 import type { DataSource as DataSourceRow } from "@prisma/client"
 import { decryptSecret } from "@/lib/crypto"
 import { createSnowLeopardClient } from "@/lib/snowleopard"
-import { isNumeric, isDateLike } from "@/lib/widget-detector"
 import { STORE_ROW_CAP } from "@/lib/widget-spec"
-import { QueryError, type Column, type QueryEngine, type QueryResult } from "@/lib/query-engine"
-
-function inferColumns(rows: Array<Record<string, unknown>>): Column[] {
-  if (rows.length === 0) return []
-  return Object.keys(rows[0]).map(name => {
-    if (isDateLike(name)) return { name, type: "date" as const }
-    const samples = rows.slice(0, 20).map(r => r[name]).filter(v => v != null && v !== "")
-    if (samples.length > 0 && samples.every(isNumeric)) return { name, type: "number" as const }
-    return { name, type: "string" as const }
-  })
-}
+import { QueryError, type QueryEngine, type QueryResult } from "@/lib/query-engine"
+import { inferColumns } from "@/lib/engines/columns"
 
 export const snowLeopardEngine: QueryEngine = {
   async retrieve(userQuery: string, source: DataSourceRow): Promise<QueryResult> {

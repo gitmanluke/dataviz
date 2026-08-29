@@ -49,3 +49,6 @@ __pycache__/
 # prisma — local sqlite db (schema + migrations are committed)
 prisma/*.db
 prisma/*.db-journal
+
+# uploaded data-source databases
+/data/
