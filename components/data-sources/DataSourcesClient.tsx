@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   Plus, CheckCircle, AlertCircle, Loader2, Trash2, Eye, EyeOff,
-  Database, Upload, ChevronRight, ChevronDown, FileSpreadsheet,
+  Database, Upload, ChevronRight, ChevronDown, FileSpreadsheet, FilePlus,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -156,25 +156,64 @@ function SourceRow({
 }) {
   const [expanded, setExpanded] = useState(false)
   const [tables, setTables] = useState<TableInfo[] | null>(null)
+  const [busy, setBusy] = useState(false)
   const fetched = useRef(false)
+  const fileInput = useRef<HTMLInputElement>(null)
   const isFiles = ds.type === "files"
+
+  const loadTables = useCallback(async () => {
+    try {
+      const r = await fetch(`/api/data-sources/${ds.id}/tables`)
+      const d: unknown = r.ok ? await r.json() : []
+      setTables(Array.isArray(d) ? (d as TableInfo[]) : [])
+    } catch {
+      setTables([])
+    }
+  }, [ds.id])
 
   useEffect(() => {
     if (!expanded || !isFiles || fetched.current) return
     fetched.current = true
-    let alive = true
-    fetch(`/api/data-sources/${ds.id}/tables`)
-      .then(r => (r.ok ? r.json() : []))
-      .then((d: unknown) => {
-        if (alive) setTables(Array.isArray(d) ? (d as TableInfo[]) : [])
-      })
-      .catch(() => {
-        if (alive) setTables([])
-      })
-    return () => {
-      alive = false
+    void loadTables()
+  }, [expanded, isFiles, loadTables])
+
+  const handleAddFiles = async (list: FileList | null) => {
+    if (!list || list.length === 0) return
+    setBusy(true)
+    const form = new FormData()
+    for (const f of Array.from(list)) form.append("files", f)
+    try {
+      const res = await fetch(`/api/data-sources/${ds.id}/files`, { method: "POST", body: form })
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string }
+        throw new Error(body.error ?? "Upload failed")
+      }
+      await loadTables()
+      toast.success("Files added")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Upload failed")
+    } finally {
+      setBusy(false)
+      if (fileInput.current) fileInput.current.value = ""
     }
-  }, [expanded, isFiles, ds.id])
+  }
+
+  const handleDropTable = async (name: string) => {
+    setBusy(true)
+    try {
+      const res = await fetch(
+        `/api/data-sources/${ds.id}/tables/${encodeURIComponent(name)}`,
+        { method: "DELETE" },
+      )
+      if (!res.ok && res.status !== 204) throw new Error()
+      await loadTables()
+      toast.success(`Dropped "${name}"`)
+    } catch {
+      toast.error(`Could not drop "${name}"`)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <>
@@ -240,17 +279,56 @@ function SourceRow({
           <td colSpan={5} className="px-6 pb-4 bg-gray-50">
             {tables === null ? (
               <p className="text-sm text-gray-400 py-2">Loading tables…</p>
-            ) : tables.length === 0 ? (
-              <p className="text-sm text-gray-400 py-2">No tables</p>
             ) : (
-              <div className="space-y-2 pt-2">
-                {tables.map(t => (
-                  <div key={t.name} className="text-sm">
-                    <span className="font-mono font-medium text-gray-800">{t.name}</span>
-                    <span className="text-gray-400"> · {t.rowCount.toLocaleString()} rows</span>
-                    <span className="text-gray-500"> — {t.columns.map(c => c.name).join(", ")}</span>
+              <div className="pt-2">
+                {tables.length === 0 ? (
+                  <p className="text-sm text-gray-400 pb-2">No tables yet</p>
+                ) : (
+                  <div className="space-y-1.5 pb-2">
+                    {tables.map(t => (
+                      <div key={t.name} className="text-sm flex items-start gap-2 group">
+                        <div className="flex-1 min-w-0">
+                          <span className="font-mono font-medium text-gray-800">{t.name}</span>
+                          <span className="text-gray-400"> · {t.rowCount.toLocaleString()} rows</span>
+                          <span className="text-gray-500"> — {t.columns.map(c => c.name).join(", ")}</span>
+                        </div>
+                        <button
+                          onClick={() => handleDropTable(t.name)}
+                          disabled={busy}
+                          className="text-gray-300 hover:text-red-600 disabled:opacity-40 shrink-0"
+                          title={`Drop "${t.name}"`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
+
+                <input
+                  ref={fileInput}
+                  type="file"
+                  multiple
+                  accept=".csv,.db,.sqlite,.sqlite3"
+                  className="hidden"
+                  onChange={e => handleAddFiles(e.target.files)}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => fileInput.current?.click()}
+                  className="flex items-center gap-1.5"
+                >
+                  {busy
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <FilePlus className="w-3.5 h-3.5" />}
+                  Add files
+                </Button>
+                <p className="text-xs text-gray-400 mt-1.5">
+                  A file whose name matches an existing table replaces it. Widgets built
+                  from this source won&apos;t change until you refresh them.
+                </p>
               </div>
             )}
           </td>
