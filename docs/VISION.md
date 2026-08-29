@@ -37,13 +37,19 @@ The core loop already works:
   `validateSql` + retry → run read-only via `better-sqlite3`). The pipeline is a
   TS port of the hardened SpeedySheets project. SnowLeopard stays as a second
   engine, picked by `DataSource.type`.
-- **Vitest** exists (`npm run test`) — 47 tests on the SQL validator + ingestion.
+- **Table management + refreshable widgets** (`feat/widget-refresh`): a `files`
+  source's tables can be added to / replaced / dropped from `/data-sources`;
+  widgets from a `files` source store their `query` + `dataSourceId` and can be
+  re-run (per-widget "Refresh data", dashboard "Refresh all") — manual only.
+- **Vitest** exists (`npm run test`) — 58 tests on the SQL validator, ingestion,
+  `runSql`, and table management.
 - **Builds clean.** `npm run build` passes (Next 16, Turbopack), TypeScript OK.
 - **`npm install` works with no flags.** 3 `npm audit` warnings remain, all
   cleared by a `next` 16.2.1 → 16.3.x bump (not yet done).
 - **`npm run lint` — 6 errors, all pre-existing and none in our code:**
-  `ChatPanel.tsx:52` and 5 in vendored `components/ui/` (carousel, chart×2,
-  sidebar, use-mobile) — clear by regenerating those from shadcn.
+  `ChatPanel.tsx:62` (setState-in-effect for source auto-select) and 5 in
+  vendored `components/ui/` (carousel, chart×2, sidebar, use-mobile) — clear by
+  regenerating those from shadcn.
 - Setup needs `.env` (copy `.env.example`, generate
   `DATA_SOURCE_ENCRYPTION_KEY`) and `npm run db:migrate`.
 - **Known broken:** the widget rendering / detection issues (see milestone 4).
@@ -96,9 +102,11 @@ split and "agent skills" scaffolding add friction with no payoff here).
   `validateSql` (keyword/function scan + `.prepare()` + `stmt.reader`) → one
   retry with the failure reason → run on a `{ readonly: true }` connection.
   Ported + hardened from the SpeedySheets CLI project.
+- **`runSql(sql, source)`** (`lib/engines/sql/index.ts`) — re-runs a stored
+  SELECT (same `validateSql` + readonly connection, no LLM). Powers widget
+  refresh.
 - **Deferred:** "Run SQL directly" mode (`/api/ai/sql` + a chat toggle) so file
-  sources work with no Anthropic key; `Widget.query` persistence + live re-run;
-  cutting SnowLeopard; a Postgres engine.
+  sources work with no Anthropic key; cutting SnowLeopard; a Postgres engine.
 
 ### Viz agent → pluggable model — done
 
@@ -118,11 +126,12 @@ split and "agent skills" scaffolding add friction with no payoff here).
 - `snowleopard` — `{ apiKey, datafileId }`
 - `files` — one or more uploaded `.csv` / `.db` files, ingested into
   `data/sources/<id>.db` (one table per file / per source-db table).
-  Multi-file → multi-table → joins.
+  Multi-file → multi-table → joins. Tables are managed from the expanded row
+  on `/data-sources`: **Add files** (`POST …/files`; a same-named file
+  replaces its table) and a per-table drop (`DELETE …/tables/[name]`).
 - Later: `sheets` (Google Sheet + a `refreshInterval`), `postgres`.
 
-Table management on a `files` source (add / replace / remove a file) and a
-bundled zero-setup sample are follow-ups.
+A bundled zero-setup sample is a follow-up.
 
 ### Secrets — done
 
@@ -170,7 +179,13 @@ hard-code it.
 4. Milestone 4 — **done**: widget-system rework (`feat/widget-system`, see
    below), then `QueryEngine` + the Claude viz agent + editable widgets
    (`feat/viz-agent`). Still open: a bundled zero-setup sample SQLite source.
-5. **Cleanup pass:** remove fake UI, add `typecheck`/`test` scripts + Vitest +
+5. ~~**Own NL→SQL engine** — CSV / `.db` upload, `sqlEngine`.~~ Done
+   (`feat/sql-engine`).
+6. ~~**Table management + refreshable widgets**~~ Done (`feat/widget-refresh`):
+   add/replace/drop tables on a `files` source; widgets store `query` +
+   `dataSourceId` and re-run on demand. Next: Google Sheets (`type: "sheets"`,
+   Desktop OAuth over loopback, `refreshInterval`).
+7. **Cleanup pass:** remove fake UI, add `typecheck`/`test` scripts + Vitest +
    CI, write the README.
 
 ### Widget system rework — done (`feat/widget-system`)
@@ -199,6 +214,21 @@ All five points landed as one commit each, plus a menu fix:
 3. `/settings` + `Setting` table for the encrypted Anthropic key.
 4. `ClaudeVizModel` (Haiku, strict forced tool) + `resolveSpec` fallback chain.
 5. `WidgetEditPanel` — type / title / x-axis / series / sort, live, no agent call.
+
+### Table management + refreshable widgets — done (`feat/widget-refresh`)
+
+1. `Widget` gains `query` + `dataSourceId` (`onDelete: SetNull`). The widgets
+   POST route only stores `query` for `files` sources — SnowLeopard SQL can't
+   be re-run, so those widgets get no refresh control.
+2. `runSql(sql, source)` (`lib/engines/sql/index.ts`) — re-runs a stored SELECT
+   through `validateSql` + a readonly connection, no LLM.
+   `POST /api/widgets/[id]/refresh` persists the fresh rows.
+3. `useWidgets` → `refresh(id)` / `refreshAll()`; `WidgetCard` "Refresh data"
+   item (only when `widget.query`); dashboard header "Refresh all".
+4. `lib/engines/sql/tables.ts` — `readTables()` / `dropTable()`.
+   `POST /api/data-sources/[id]/files` (a same-named file replaces its table),
+   `DELETE /api/data-sources/[id]/tables/[table]`, both surfaced in the
+   expanded `SourceRow` on `/data-sources`.
 
 ## "v1 done" checklist
 

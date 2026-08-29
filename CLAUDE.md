@@ -38,6 +38,12 @@ xKey / series / sort) in `spec`. `WidgetCard` renders `applySpec(data, spec)`.
 The edit panel writes `spec` straight to `PATCH /api/widgets/[id]` — no agent
 call.
 
+A widget from a `files` source also stores the `query` (+ `dataSourceId`) that
+produced its rows. `POST /api/widgets/[id]/refresh` re-runs that SQL via
+`runSql` and swaps in fresh rows — surfaced as "Refresh data" per widget and
+"Refresh all" on the dashboard. SnowLeopard widgets have no re-runnable SQL, so
+they get no `query` and no refresh control.
+
 ## Layout
 
 - `app/` — routes. `app/api/**` route handlers are the only server code.
@@ -50,7 +56,10 @@ call.
 - `lib/` — `db.ts` (Prisma singleton), `crypto.ts` (AES-256-GCM secrets),
   `settings.ts` (`getAnthropicKey`), `anthropic.ts` / `viz/*` (the viz agent),
   `query-engine.ts` + `engines/*` (data: `columns.ts` shared inference,
-  `snowleopard.ts`, `sql/{store,validator,ingest,ingest-files,nl-to-sql,index}.ts`),
+  `snowleopard.ts`,
+  `sql/{store,validator,ingest,ingest-files,nl-to-sql,tables,index}.ts` —
+  `index.ts` also exports `runSql` (re-run a stored SELECT, no LLM) for widget
+  refresh; `tables.ts` has `readTables` / `dropTable`),
   `data-sources.ts` (row → client), `widget-detector.ts` (`detectSpec`, pure),
   `widget-spec.ts` (`applySpec`, pure), `widget-data.ts` (chart helpers, pure),
   `dashboards.ts`, `types.ts`. Files that touch the DB, fs, or an API key import
