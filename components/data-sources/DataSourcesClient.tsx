@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   Plus, CheckCircle, AlertCircle, Loader2, Trash2, Eye, EyeOff,
   Database, Upload, ChevronRight, ChevronDown, FileSpreadsheet,
@@ -156,16 +156,25 @@ function SourceRow({
 }) {
   const [expanded, setExpanded] = useState(false)
   const [tables, setTables] = useState<TableInfo[] | null>(null)
+  const fetched = useRef(false)
   const isFiles = ds.type === "files"
 
   useEffect(() => {
-    if (expanded && isFiles && tables === null) {
-      fetch(`/api/data-sources/${ds.id}/tables`)
-        .then(r => (r.ok ? r.json() : []))
-        .then(setTables)
-        .catch(() => setTables([]))
+    if (!expanded || !isFiles || fetched.current) return
+    fetched.current = true
+    let alive = true
+    fetch(`/api/data-sources/${ds.id}/tables`)
+      .then(r => (r.ok ? r.json() : []))
+      .then((d: unknown) => {
+        if (alive) setTables(Array.isArray(d) ? (d as TableInfo[]) : [])
+      })
+      .catch(() => {
+        if (alive) setTables([])
+      })
+    return () => {
+      alive = false
     }
-  }, [expanded, isFiles, tables, ds.id])
+  }, [expanded, isFiles, ds.id])
 
   return (
     <>
