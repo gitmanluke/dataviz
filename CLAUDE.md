@@ -17,11 +17,12 @@ Primary goal right now: a clean, working portfolio piece.
 - Next.js 16 (App Router) + React 19 + TypeScript (strict)
 - Tailwind CSS 4, shadcn/ui (components in `components/ui/` — vendored, don't hand-edit)
 - recharts (charts), react-grid-layout (dashboard grid), sonner (toasts)
-- Data layer: `QueryEngine` picked by `DataSource.type` — `snowLeopardEngine`
-  (`@snowleopard-ai/client`) for `snowleopard`, else `sqlEngine` (per-source
-  SQLite → NL→SQL via Claude, ported from SpeedySheets). `files` = uploaded
-  CSV / `.db`; `sheets` = a Google spreadsheet synced tab-by-tab into the same
-  per-source SQLite DB (`lib/integrations/google/*`, see `docs/google-sheets.md`)
+- Data layer: one `QueryEngine` — `sqlEngine` (`lib/engines/sql`): each
+  `DataSource` gets a per-source SQLite DB (`data/sources/<id>.db`), Claude
+  writes a SELECT against its schema, it's validated + run read-only. `files` =
+  uploaded CSV / `.db`; `sheets` = a Google spreadsheet synced tab-by-tab into
+  the same DB (`lib/integrations/google/*`, see `docs/google-sheets.md`). The
+  `QueryEngine` interface keeps the route + viz agent decoupled from fetching.
 - Viz layer: Claude Haiku (`@anthropic-ai/sdk`) behind a `VizModel`, with the
   `detectSpec` heuristic as the always-available fallback
 - SQLite: Prisma 6 for **app data**; `better-sqlite3` for **uploaded user data**
@@ -39,12 +40,10 @@ xKey / series / sort) in `spec`. `WidgetCard` renders `applySpec(data, spec)`.
 The edit panel writes `spec` straight to `PATCH /api/widgets/[id]` — no agent
 call.
 
-A widget from a `files` or `sheets` source also stores the `query` (+
-`dataSourceId`) that produced its rows. `POST /api/widgets/[id]/refresh` re-runs
-that SQL via `runSql` and swaps in fresh rows (for `sheets`, it re-pulls from
-Google first) — surfaced as "Refresh data" per widget and "Refresh all" on the
-dashboard. SnowLeopard widgets have no re-runnable SQL, so
-they get no `query` and no refresh control.
+Every widget also stores the `query` (+ `dataSourceId`) that produced its rows.
+`POST /api/widgets/[id]/refresh` re-runs that SQL via `runSql` and swaps in
+fresh rows (for `sheets`, it re-pulls from Google first) — surfaced as "Refresh
+data" per widget and "Refresh all" on the dashboard.
 
 ## Layout
 
@@ -58,7 +57,6 @@ they get no `query` and no refresh control.
 - `lib/` — `db.ts` (Prisma singleton), `crypto.ts` (AES-256-GCM secrets),
   `settings.ts` (`getAnthropicKey`), `anthropic.ts` / `viz/*` (the viz agent),
   `query-engine.ts` + `engines/*` (data: `columns.ts` shared inference,
-  `snowleopard.ts`,
   `sql/{store,validator,ingest,ingest-files,nl-to-sql,tables,index}.ts` —
   `index.ts` also exports `runSql` (re-run a stored SELECT, no LLM) for widget
   refresh; `tables.ts` has `readTables` / `dropTable`),
