@@ -6,13 +6,10 @@
 
 ![DataViz — asking a question, getting a chart, editing the widget](screenshots/nl-query.gif)
 
-DataViz is a local-first dashboard builder. Point it at a CSV, a SQLite file, or
+DataViz is a dashboard builder for everyone. Point it at a CSV, a SQLite file, or
 a Google Sheet; ask a question in natural language; it writes the SQL, runs it
-safely, and turns the answer into a chart you can arrange, edit, and refresh.
-Your data and dashboards never leave your machine.
+safely, and turns the answer into a chart you can arrange, edit, and refresh on a scheduled interval.
 
-Built solo, end to end — the natural-language-to-SQL pipeline, the query-safety
-layer, and the Google Sheets OAuth integration are all hand-built.
 
 ---
 
@@ -42,7 +39,7 @@ phrasing, with a deterministic heuristic as the always-available fallback.
 - **Files** — upload one or more `.csv` / `.db` files. Each becomes a table in a
   per-source SQLite database; add, replace, or drop tables later.
 - **Google Sheets** — connect a spreadsheet through the Google Drive Picker.
-  Each tab becomes a table. See [`docs/google-sheets.md`](docs/google-sheets.md).
+  Each tab becomes a table.
 
 ### Refreshable widgets
 
@@ -52,7 +49,7 @@ Every widget remembers the query that built it. Hit **Refresh data** (or
 **Refresh all**) to re-run it — no LLM call. A Google Sheet source can also
 auto-refresh on a schedule (`manual` … `monthly`), enforced opportunistically on
 app activity and gated by a Drive `modifiedTime` check, so a changed sheet
-quietly updates the dashboards that depend on it.
+quietly updates the dashboards that depend on it. This can be used to automatically track weekly or monthly statistics on data that is continuously being added to a data source.
 
 ### Editable, drag-and-drop dashboards
 
@@ -127,18 +124,6 @@ orders joinable to a product catalog) to try it out.
   [`docs/google-sheets.md`](docs/google-sheets.md).
 
 ---
-
-## Development
-
-```bash
-npm run test        # 82 Vitest unit tests
-npm run typecheck   # tsc --noEmit
-npm run lint        # eslint
-npm run build       # production build
-```
-
-Tests cover the SQL validator, file/sheet ingestion, the no-LLM refresh path,
-and the Google integration (token cache, spreadsheet parsing, sync scheduling).
 
 ### Benchmark
 
