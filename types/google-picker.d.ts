@@ -43,6 +43,7 @@ declare global {
       addView(view: DocsView | ViewId): this
       setOAuthToken(token: string): this
       setDeveloperKey(key: string): this
+      setAppId(appId: string): this
       setCallback(callback: (data: ResponseObject) => void): this
       setTitle(title: string): this
       enableFeature(feature: Feature): this

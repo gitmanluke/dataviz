@@ -179,7 +179,16 @@ export async function getConnectionStatus(): Promise<ConnectionStatus> {
 export interface PickerConfig {
   accessToken: string
   apiKey: string
+  appId: string
   expiresAt: number
+}
+
+/** The Cloud project number — the numeric prefix of an OAuth client id
+ *  (`<projectNumber>-xxxx.apps.googleusercontent.com`). The Picker needs it as
+ *  the "app id" so that files picked under the drive.file scope become readable
+ *  by our token. */
+function appIdFromClientId(clientId: string): string {
+  return clientId.split("-")[0] ?? ""
 }
 
 export async function getPickerConfig(): Promise<PickerConfig | null> {
@@ -187,7 +196,12 @@ export async function getPickerConfig(): Promise<PickerConfig | null> {
   if (!creds) return null
   try {
     const { token, expiresAt } = await getToken()
-    return { accessToken: token, apiKey: creds.apiKey, expiresAt }
+    return {
+      accessToken: token,
+      apiKey: creds.apiKey,
+      appId: appIdFromClientId(creds.clientId),
+      expiresAt,
+    }
   } catch {
     return null
   }

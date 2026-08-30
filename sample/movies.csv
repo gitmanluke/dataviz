@@ -1,0 +1,37 @@
+title,director,year,genre,rating,box_office_millions,runtime_min
+Inception,Christopher Nolan,2010,Sci-Fi,8.8,836,148
+The Dark Knight,Christopher Nolan,2008,Action,9.0,1005,152
+Interstellar,Christopher Nolan,2014,Sci-Fi,8.6,701,169
+Oppenheimer,Christopher Nolan,2023,Drama,8.3,975,180
+Dunkirk,Christopher Nolan,2017,War,7.8,527,106
+Jurassic Park,Steven Spielberg,1993,Adventure,8.2,1046,127
+Schindler's List,Steven Spielberg,1993,Drama,9.0,322,195
+E.T. the Extra-Terrestrial,Steven Spielberg,1982,Family,7.9,792,115
+Saving Private Ryan,Steven Spielberg,1998,War,8.6,482,169
+Jaws,Steven Spielberg,1975,Thriller,8.1,476,124
+Pulp Fiction,Quentin Tarantino,1994,Crime,8.9,213,154
+Django Unchained,Quentin Tarantino,2012,Western,8.4,425,165
+Inglourious Basterds,Quentin Tarantino,2009,War,8.3,321,153
+Kill Bill: Vol. 1,Quentin Tarantino,2003,Action,8.2,180,111
+Once Upon a Time in Hollywood,Quentin Tarantino,2019,Comedy,7.6,377,161
+Goodfellas,Martin Scorsese,1990,Crime,8.7,47,145
+The Departed,Martin Scorsese,2006,Crime,8.5,291,151
+The Wolf of Wall Street,Martin Scorsese,2013,Comedy,8.2,407,180
+Taxi Driver,Martin Scorsese,1976,Drama,8.2,28,114
+The Irishman,Martin Scorsese,2019,Crime,7.8,8,209
+Dune,Denis Villeneuve,2021,Sci-Fi,8.0,402,155
+Blade Runner 2049,Denis Villeneuve,2017,Sci-Fi,8.0,260,164
+Arrival,Denis Villeneuve,2016,Sci-Fi,7.9,203,116
+Sicario,Denis Villeneuve,2015,Thriller,7.6,85,121
+Dune: Part Two,Denis Villeneuve,2024,Sci-Fi,8.5,711,166
+Lady Bird,Greta Gerwig,2017,Comedy,7.4,79,94
+Little Women,Greta Gerwig,2019,Drama,7.8,218,135
+Barbie,Greta Gerwig,2023,Comedy,6.8,1446,114
+Parasite,Bong Joon-ho,2019,Thriller,8.5,263,132
+Snowpiercer,Bong Joon-ho,2013,Sci-Fi,7.1,87,126
+Okja,Bong Joon-ho,2017,Adventure,7.3,2,120
+Memories of Murder,Bong Joon-ho,2003,Crime,8.1,1,131
+Gladiator,Ridley Scott,2000,Action,8.5,465,155
+Alien,Ridley Scott,1979,Horror,8.5,106,117
+The Martian,Ridley Scott,2015,Sci-Fi,8.0,630,144
+Blade Runner,Ridley Scott,1982,Sci-Fi,8.1,41,117

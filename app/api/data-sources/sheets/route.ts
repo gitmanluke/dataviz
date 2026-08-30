@@ -46,7 +46,15 @@ export async function POST(request: NextRequest) {
     assertSpreadsheet(file)
   } catch (error) {
     if (error instanceof GoogleApiError) {
-      return NextResponse.json({ error: error.message }, { status: error.status === 404 ? 404 : 422 })
+      console.error("[data-sources/sheets] drive lookup failed:", error.status, error.message)
+      const hint =
+        error.status === 404
+          ? " (the Picker must run with the app id so a drive.file pick is shared with the app)"
+          : ""
+      return NextResponse.json(
+        { error: error.message + hint },
+        { status: error.status === 404 ? 404 : 422 },
+      )
     }
     throw error
   }

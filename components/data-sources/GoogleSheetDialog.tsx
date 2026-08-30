@@ -61,9 +61,10 @@ export function GoogleSheetDialog({
       await loadPicker()
       const res = await fetch("/api/integrations/google/token")
       if (!res.ok) throw new Error("Google connection unavailable — reconnect in Settings.")
-      const { accessToken, apiKey } = (await res.json()) as {
+      const { accessToken, apiKey, appId } = (await res.json()) as {
         accessToken: string
         apiKey: string
+        appId: string
       }
 
       const { google } = window
@@ -74,6 +75,7 @@ export function GoogleSheetDialog({
         .addView(view)
         .setOAuthToken(accessToken)
         .setDeveloperKey(apiKey)
+        .setAppId(appId)
         .setTitle("Choose a spreadsheet")
         .setCallback(data => {
           if (data.action === google.picker.Action.PICKED) {
