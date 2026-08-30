@@ -32,7 +32,12 @@ const WIDGET_ICONS: Record<Widget["type"], React.ComponentType<{ className?: str
 
 export function ChatPanel({ onClose, onAddWidget }: ChatPanelProps) {
   const { dataSources } = useDataSources()
-  const [selectedSource, setSelectedSource] = useState<DataSource | null>(null)
+  // Track the explicit choice by id; fall back to the first connected source.
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const selectedSource: DataSource | null =
+    dataSources.find(ds => ds.id === selectedId) ??
+    dataSources.find(ds => ds.status === "connected") ??
+    null
   const [messages, setMessages] = useState<Message[]>([{
     id: "1",
     text: "Hi! Select a data source and ask me anything about your data. I'll answer in plain English and generate a chart or widget you can add to your dashboard.",
@@ -54,14 +59,6 @@ export function ChatPanel({ onClose, onAddWidget }: ChatPanelProps) {
   const { isLoading, generate } = useWidgetAgent({
     dataSourceId: selectedSource?.id ?? "",
   })
-
-  // Auto-select first connected source
-  useEffect(() => {
-    if (!selectedSource) {
-      const connected = dataSources.find(ds => ds.status === "connected")
-      if (connected) setSelectedSource(connected)
-    }
-  }, [dataSources, selectedSource])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -169,7 +166,7 @@ export function ChatPanel({ onClose, onAddWidget }: ChatPanelProps) {
             <span className="text-xs text-gray-500 whitespace-nowrap">Source:</span>
             <select
               value={selectedSource?.id ?? ""}
-              onChange={e => setSelectedSource(dataSources.find(d => d.id === e.target.value) ?? null)}
+              onChange={e => setSelectedId(e.target.value || null)}
               className="text-xs border border-gray-200 rounded px-2 py-1 flex-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
               <option value="">Select…</option>
