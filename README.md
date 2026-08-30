@@ -24,9 +24,9 @@ replaced a paid third-party query API) and the Google Sheets OAuth integration.
 
 <!-- ![NL query](screenshots/nl-query.gif) -->
 
-Ask *"which director has the highest average rating?"* and DataViz sends your
-data's schema to Claude, which writes a single `SELECT`. Before it runs, a
-validation layer checks it:
+Ask *"which channel drives the most revenue?"* and DataViz sends your data's
+schema to Claude, which writes a single `SELECT`. Before it runs, a validation
+layer checks it:
 
 - a denylist of write keywords and filesystem functions, scanned after string
   literals and comments are stripped
@@ -123,8 +123,9 @@ npm run db:migrate
 npm run dev
 ```
 
-Open <http://localhost:3000>. Upload [`sample/movies.csv`](sample/movies.csv)
-and [`sample/directors.csv`](sample/directors.csv) to try it out.
+Open <http://localhost:3000>. Upload [`sample/sales.csv`](sample/sales.csv) and
+[`sample/products.csv`](sample/products.csv) (a small B2B hardware dataset —
+orders joinable to a product catalog) to try it out.
 
 - **Natural-language queries** need an Anthropic API key — add one at
   `/settings` (there's a heuristic fallback without it).
@@ -155,12 +156,12 @@ API calls, so it needs a key and is off by default:
 ANTHROPIC_API_KEY=sk-ant-... npm run bench
 ```
 
-Over 36 runs (12 questions × 3), against Claude Haiku 4.5:
+Over 36 runs (12 questions × 3) against Claude Haiku 4.5, on the sample data:
 
 | metric | value |
 |---|---|
-| latency, median | **2.2 s** |
-| latency, p95 | 3.0 s |
+| latency, median | **2.5 s** |
+| latency, p95 | 3.3 s |
 | model tokens / widget | ~1,450 in · ~190 out |
 | model cost | **~$0.0024 / widget** (≈ $2.40 per 1,000) |
 

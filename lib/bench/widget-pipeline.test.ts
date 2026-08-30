@@ -26,18 +26,18 @@ const PRICE_OUT = 5.0
 const SOURCE_ID = "bench-source"
 const REPEATS = 3
 const QUESTIONS = [
-  "how many movies did each director make?",
-  "which director has the highest average rating?",
-  "total box office by director",
-  "average runtime by genre",
-  "top 5 movies by box office",
-  "how many movies are in each genre?",
-  "average rating by decade",
-  "which genre has the highest average box office?",
-  "list every sci-fi movie with its rating",
-  "what is the highest-rated movie?",
-  "count of movies per year",
-  "directors ranked by total box office",
+  "total revenue by region",
+  "monthly revenue over time",
+  "which channel drives the most revenue?",
+  "top 5 products by revenue",
+  "how many units were sold in each category?",
+  "average order size by region",
+  "revenue by category",
+  "which supplier's products generate the most revenue?",
+  "total revenue in 2025",
+  "list every order in the APAC region",
+  "monthly revenue for Displays products",
+  "how many orders did each channel have?",
 ]
 
 const source = {
@@ -52,8 +52,8 @@ function seed(): void {
   const db = openWritable(SOURCE_ID)
   try {
     for (const [file, table] of [
-      ["movies.csv", "movies"],
-      ["directors.csv", "directors"],
+      ["sales.csv", "sales"],
+      ["products.csv", "products"],
     ]) {
       const { columns, rows } = rowsFromCsv(readFileSync(path.join(dir, file)))
       createTable(db, table, columns, rows)

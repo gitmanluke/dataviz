@@ -151,17 +151,15 @@ app, evaluate **Tauri** (light Rust shell) vs Electron. Not before v1.
 ## Sample data & the demo
 
 DataViz stays a general-purpose dashboard builder — it makes no assumptions
-about what kind of data you point it at. But the demo has to work with zero
-setup, so:
+about what kind of data you point it at.
 
-- Bundle one small sample dataset (a SQLite file) and register it as a data
-  source on first run. A reviewer clones, runs one command, and can immediately
-  ask questions and build a dashboard.
-- Pick a sample that exercises every widget type — something with a time series,
-  some categories, and a few plain numbers (the Snow Leopard `superheroes.db`
-  or a similar public dataset works).
-- Replace the current hard-coded travel-survey example prompts in `ChatPanel`
-  with ones that match whatever sample ships.
+- `sample/sales.csv` + `sample/products.csv` — a small B2B hardware dataset
+  (orders joinable to a product catalog) that exercises every widget type: a
+  15-month time series, categorical breakdowns, single headline numbers, and a
+  cross-table join.
+- **Still to do:** register the sample as a data source on first run (clone →
+  one command → build a dashboard), and replace the hard-coded travel-survey
+  example prompts in `ChatPanel` with sales ones.
 
 Personal use — e.g. importing a CSV of job applications and building a tracker —
 is just one thing the general tool can do. Nothing in the codebase should
