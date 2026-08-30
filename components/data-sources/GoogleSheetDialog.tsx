@@ -42,6 +42,10 @@ export function GoogleSheetDialog({
   const [name, setName] = useState("")
   const [interval, setInterval] = useState("on-open")
   const [picking, setPicking] = useState(false)
+  // Radix's modal dialog traps focus and blocks pointer events on <body>, which
+  // makes the Picker (mounted on <body>) unusable. So we hide our dialog while
+  // the Picker is on screen and bring it back — with the selection — after.
+  const [pickerActive, setPickerActive] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -50,6 +54,7 @@ export function GoogleSheetDialog({
     setName("")
     setInterval("on-open")
     setPicking(false)
+    setPickerActive(false)
     setBusy(false)
     setError(null)
   }
@@ -71,6 +76,10 @@ export function GoogleSheetDialog({
       const view = new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS).setMimeTypes(
         SPREADSHEET_MIME,
       )
+      const done = () => {
+        setPicking(false)
+        setPickerActive(false)
+      }
       const picker = new google.picker.PickerBuilder()
         .addView(view)
         .setOAuthToken(accessToken)
@@ -82,19 +91,18 @@ export function GoogleSheetDialog({
             const doc = data.docs[0]
             setPicked({ id: doc.id, name: doc.name })
             setName(prev => prev || doc.name)
-          }
-          if (
-            data.action === google.picker.Action.PICKED ||
-            data.action === google.picker.Action.CANCEL
-          ) {
-            setPicking(false)
+            done()
+          } else if (data.action === google.picker.Action.CANCEL) {
+            done()
           }
         })
         .build()
+      setPickerActive(true)
       picker.setVisible(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not open the picker")
       setPicking(false)
+      setPickerActive(false)
     }
   }
 
@@ -119,28 +127,16 @@ export function GoogleSheetDialog({
 
   return (
     <Dialog
-      open={open}
+      open={open && !pickerActive}
       onOpenChange={o => {
+        if (pickerActive) return
         if (!o && !busy) {
           reset()
           onClose()
         }
       }}
     >
-      <DialogContent
-        className="sm:max-w-md"
-        // The Google Picker mounts its own overlay on <body>; clicking it (or
-        // the focus shift while it's open) would otherwise close this dialog.
-        onInteractOutside={e => {
-          const el = e.target as HTMLElement | null
-          if (picking || el?.closest(".picker-dialog, .picker, .picker-dialog-bg, .picker-frame")) {
-            e.preventDefault()
-          }
-        }}
-        onEscapeKeyDown={e => {
-          if (picking) e.preventDefault()
-        }}
-      >
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Connect Google Sheets</DialogTitle>
         </DialogHeader>
