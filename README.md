@@ -1,36 +1,163 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DataViz
 
-## Getting Started
+[![CI](https://github.com/gitmanluke/dataviz/actions/workflows/ci.yml/badge.svg)](https://github.com/gitmanluke/dataviz/actions/workflows/ci.yml)
 
-First, run the development server:
+**Ask your data a question in plain English. Get a dashboard.**
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+DataViz is a local-first dashboard builder. Point it at a CSV, a SQLite file, or
+a Google Sheet; ask a question in natural language; it writes the SQL, runs it
+safely, and turns the answer into a chart you can arrange, edit, and refresh.
+Your data and dashboards never leave your machine.
+
+Built solo, end to end — including the natural-language-to-SQL pipeline (which
+replaced a paid third-party query API) and the Google Sheets OAuth integration.
+
+<!-- Add screenshots/demo.gif and uncomment:
+![DataViz demo](screenshots/demo.gif)
+-->
+
+---
+
+## Features
+
+### Natural language → SQL → chart
+
+<!-- ![NL query](screenshots/nl-query.gif) -->
+
+Ask *"which director has the highest average rating?"* and DataViz sends your
+data's schema to Claude, which writes a single `SELECT`. Before it runs, a
+validation layer checks it:
+
+- a denylist of write keywords and filesystem functions, scanned after string
+  literals and comments are stripped
+- `better-sqlite3`'s prepared-statement parser rejects multi-statement input and
+  unknown tables/columns
+- `statement.reader` confirms it's read-only
+- the query runs on a `{ readonly: true }` connection as defense in depth
+
+If validation fails, the failure reason is fed back for one retry. A second
+model then picks the widget type (bar / line / pie / stat / table) from your
+phrasing, with a deterministic heuristic as the always-available fallback.
+
+### Bring your own data
+
+<!-- ![data sources](screenshots/data-sources.gif) -->
+
+- **Files** — upload one or more `.csv` / `.db` files. Each becomes a table in a
+  per-source SQLite database; add, replace, or drop tables later.
+- **Google Sheets** — connect a spreadsheet through the Google Drive Picker.
+  Each tab becomes a table. See [`docs/google-sheets.md`](docs/google-sheets.md).
+
+### Refreshable widgets
+
+<!-- ![refresh](screenshots/refresh.gif) -->
+
+Every widget remembers the query that built it. Hit **Refresh data** (or
+**Refresh all**) to re-run it — no LLM call. A Google Sheet source can also
+auto-refresh on a schedule (`manual` … `monthly`), enforced opportunistically on
+app activity and gated by a Drive `modifiedTime` check, so a changed sheet
+quietly updates the dashboards that depend on it.
+
+### Editable, drag-and-drop dashboards
+
+<!-- ![dashboard](screenshots/dashboard.gif) -->
+
+Arrange widgets on a grid. Every widget stores its raw rows plus an editable
+spec (chart type, x-axis, series, sort), so you can retune the visualization
+without asking again.
+
+---
+
+## How it works
+
+```
+ChatPanel ──▶ POST /api/ai/widget
+                  │
+                  ├─ sqlEngine.retrieve()      per-source SQLite → Claude writes
+                  │                            SELECT → validate + 1 retry → run read-only
+                  │
+                  └─ resolveSpec()             ClaudeVizModel (Haiku) or detectSpec heuristic
+                  │
+                  ▼
+             { spec, rows }  ──▶  widget: raw rows in `data`, WidgetSpec in `spec`
+                                  WidgetCard renders applySpec(data, spec)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Two interfaces keep the seams clean:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **`QueryEngine`** — how rows are fetched for a question. One implementation
+  (`sqlEngine`) serves both source types; the route and viz agent don't care.
+- **`VizModel`** — how a chart spec is chosen. `ClaudeVizModel` when an Anthropic
+  key is set, `detectSpec` otherwise and on any failure (it never throws).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**Google Sheets** (`lib/integrations/google/*`): a Desktop-app OAuth 2.0
+loopback flow with PKCE; the refresh token is stored AES-256-GCM-encrypted and
+never leaves the server; access tokens are minted on demand and cached. The
+Drive Picker is the one place a short-lived, read-only token reaches the browser.
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## Tech stack
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Next.js 16 (App Router, Turbopack) · React 19 · TypeScript (strict) ·
+Tailwind CSS 4 · shadcn/ui · Prisma 6 + SQLite (app data) ·
+better-sqlite3 (per-source user data) · recharts · react-grid-layout ·
+Anthropic SDK · google-auth-library · Vitest
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## Run it locally
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Requires Node 20+.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+git clone https://github.com/gitmanluke/dataviz.git
+cd dataviz
+npm install
+
+cp .env.example .env
+# generate a 32-byte key and paste it into DATA_SOURCE_ENCRYPTION_KEY in .env:
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+
+npm run db:migrate
+npm run dev
+```
+
+Open <http://localhost:3000>. Upload [`sample/movies.csv`](sample/movies.csv)
+and [`sample/directors.csv`](sample/directors.csv) to try it out.
+
+- **Natural-language queries** need an Anthropic API key — add one at
+  `/settings` (there's a heuristic fallback without it).
+- **Google Sheets** needs a Google Cloud OAuth client — see
+  [`docs/google-sheets.md`](docs/google-sheets.md).
+
+---
+
+## Development
+
+```bash
+npm run test        # 82 Vitest unit tests
+npm run typecheck   # tsc --noEmit
+npm run lint        # eslint
+npm run build       # production build
+```
+
+Tests cover the SQL validator, file/sheet ingestion, the no-LLM refresh path,
+and the Google integration (token cache, spreadsheet parsing, sync scheduling).
+
+---
+
+## What's mine vs. off-the-shelf
+
+**Built for this project:** the NL→SQL pipeline and its validator, the viz agent
+and heuristic, the Google Sheets integration (OAuth, sync scheduler, Picker
+wiring), the `QueryEngine` / `VizModel` architecture, the widget-spec system,
+and every API route.
+
+**Off-the-shelf:** shadcn/ui primitives (vendored under `components/ui/`),
+recharts, react-grid-layout. `pydantic-ai/` is a standalone reference example,
+not part of the app.
+
+## License
+
+MIT — see [`LICENSE`](LICENSE).
