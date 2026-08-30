@@ -127,7 +127,20 @@ export function GoogleSheetDialog({
         }
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        className="sm:max-w-md"
+        // The Google Picker mounts its own overlay on <body>; clicking it (or
+        // the focus shift while it's open) would otherwise close this dialog.
+        onInteractOutside={e => {
+          const el = e.target as HTMLElement | null
+          if (picking || el?.closest(".picker-dialog, .picker, .picker-dialog-bg, .picker-frame")) {
+            e.preventDefault()
+          }
+        }}
+        onEscapeKeyDown={e => {
+          if (picking) e.preventDefault()
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Connect Google Sheets</DialogTitle>
         </DialogHeader>
