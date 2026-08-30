@@ -9,13 +9,17 @@ const ANTHROPIC_KEY = "anthropic_api_key"
  * stored via /settings; falls back to the ANTHROPIC_API_KEY env var (dev/CI).
  */
 export async function getAnthropicKey(): Promise<string | null> {
-  const row = await prisma.setting.findUnique({ where: { key: ANTHROPIC_KEY } })
-  if (row) {
-    try {
-      return decryptSecret(row.value)
-    } catch {
-      return null
+  try {
+    const row = await prisma.setting.findUnique({ where: { key: ANTHROPIC_KEY } })
+    if (row) {
+      try {
+        return decryptSecret(row.value)
+      } catch {
+        return null
+      }
     }
+  } catch {
+    // settings table unavailable (e.g. a benchmark run) — fall back to the env var
   }
   return process.env.ANTHROPIC_API_KEY?.trim() || null
 }

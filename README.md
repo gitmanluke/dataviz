@@ -145,6 +145,25 @@ npm run build       # production build
 Tests cover the SQL validator, file/sheet ingestion, the no-LLM refresh path,
 and the Google integration (token cache, spreadsheet parsing, sync scheduling).
 
+### Benchmark
+
+`npm run bench` runs the full question → widget pipeline against the sample data
+and reports median / p95 latency and mean model cost per widget. It makes real
+API calls, so it needs a key and is off by default:
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-... npm run bench
+```
+
+<!-- Paste your numbers here after running:
+| metric | value |
+|---|---|
+| median latency | ~X s |
+| p95 latency | ~X s |
+| model cost | ~$X per widget |
+-->
+
+
 ---
 
 ## What's mine vs. off-the-shelf
