@@ -20,13 +20,19 @@ export async function POST(
     include: { dataSource: true },
   })
   if (!widget) return NextResponse.json({ error: "Widget not found" }, { status: 404 })
+  if (widget.query && !widget.dataSource) {
+    return NextResponse.json(
+      { error: "This widget's data source was removed — recreate the widget." },
+      { status: 400 },
+    )
+  }
   if (!widget.query || !widget.dataSource || !REFRESHABLE.has(widget.dataSource.type)) {
     return NextResponse.json({ error: "This widget can't be refreshed" }, { status: 400 })
   }
 
   let source = widget.dataSource
   if (source.type === "sheets") {
-    await resyncSource(source)
+    await resyncSource(source, { force: true })
     source = (await prisma.dataSource.findUnique({ where: { id: source.id } })) ?? source
     if (source.status === "error" && source.syncError) {
       return NextResponse.json({ error: source.syncError }, { status: 409 })

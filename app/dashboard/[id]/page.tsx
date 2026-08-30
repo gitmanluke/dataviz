@@ -54,7 +54,7 @@ export default function DashboardPage() {
     toast.success("Widget added to dashboard")
   }
 
-  const refreshableCount = widgets.filter(w => w.query).length
+  const refreshableCount = widgets.filter(w => w.query && w.dataSourceId).length
 
   const handleRefreshAll = async () => {
     setRefreshingAll(true)

@@ -126,7 +126,7 @@ export function useWidgets(dashboardId: string) {
   }, [])
 
   const refreshAll = useCallback(async (): Promise<{ ok: number; failed: number }> => {
-    const targets = store.widgets.filter(w => w.query)
+    const targets = store.widgets.filter(w => w.query && w.dataSourceId)
     const results = await Promise.allSettled(targets.map(w => refresh(w.id)))
     return {
       ok: results.filter(r => r.status === "fulfilled").length,

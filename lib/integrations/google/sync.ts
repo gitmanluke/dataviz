@@ -33,11 +33,16 @@ export function isDue(
 
 const inflight = new Set<string>()
 
-/** Re-pull a sheets source if its Drive modifiedTime advanced, then re-run every
- *  widget bound to it. Never throws — failures land in status / syncError. */
-export async function resyncSource(source: DataSourceRow): Promise<void> {
+/** Re-pull a sheets source and re-run every widget bound to it. Opportunistic
+ *  callers skip the pull when Drive's modifiedTime hasn't advanced; pass
+ *  `force` (a manual "Refresh" / "Sync now") to pull regardless. Never throws —
+ *  failures land in status / syncError. */
+export async function resyncSource(
+  source: DataSourceRow,
+  opts: { force?: boolean } = {},
+): Promise<void> {
   if (source.type !== "sheets" || !source.sheetId) return
-  if (inflight.has(source.id)) return
+  if (inflight.has(source.id) && !opts.force) return
   inflight.add(source.id)
   try {
     let file
@@ -52,6 +57,7 @@ export async function resyncSource(source: DataSourceRow): Promise<void> {
     }
 
     const unchanged =
+      !opts.force &&
       source.sheetModifiedAt != null &&
       new Date(file.modifiedTime).getTime() <= source.sheetModifiedAt.getTime()
 

@@ -16,7 +16,7 @@ import { WidgetEditPanel } from "./WidgetEditPanel"
 import type { Widget, WidgetSpec } from "@/lib/types"
 
 interface WidgetCardProps {
-  widget: Pick<Widget, "id" | "type" | "title" | "data" | "spec" | "query">
+  widget: Pick<Widget, "id" | "type" | "title" | "data" | "spec" | "query" | "dataSourceId">
   onDelete: () => void
   onDuplicate: () => void
   onRename: (title: string) => void
@@ -293,7 +293,7 @@ export function WidgetCard({ widget, onDelete, onDuplicate, onRename, onUpdateSp
                 <SlidersHorizontal className="w-4 h-4 mr-2" />
                 Edit
               </DropdownMenuItem>
-              {widget.query && (
+              {widget.query && widget.dataSourceId && (
                 <DropdownMenuItem onSelect={() => handleRefresh()} disabled={refreshing}>
                   <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
                   Refresh data

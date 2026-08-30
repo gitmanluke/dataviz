@@ -22,7 +22,7 @@ export async function POST(
     return NextResponse.json({ error: "Reconnect Google in Settings." }, { status: 409 })
   }
 
-  await resyncSource(source)
+  await resyncSource(source, { force: true })
 
   const updated = await prisma.dataSource.findUnique({ where: { id } })
   if (!updated) return NextResponse.json({ error: "Data source not found" }, { status: 404 })
