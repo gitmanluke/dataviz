@@ -46,7 +46,11 @@ describe("blocked", () => {
   it("readfile", () => bad("SELECT readfile('/etc/passwd')", "function: readfile"))
   it("unknown table", () => bad("SELECT * FROM ghost", "no such table"))
   it("unknown column", () => bad("SELECT nope FROM people", "no such column"))
-  it("syntax error", () => bad("SELECT name FROM people WHERE", "incomplete"))
+  it("syntax error", () => {
+    // rejected at db.prepare(); exact SQLite wording varies by build
+    const r = validateSql("SELECT name FROM people WHERE", db)
+    expect(r).toEqual({ ok: false, reason: expect.any(String) })
+  })
   it("empty", () => bad("   ", "empty"))
   it("non-select expression-only is fine", () => ok("SELECT 1 + 1 AS two"))
 })

@@ -102,7 +102,7 @@ Anthropic SDK · google-auth-library · Vitest
 
 ## Run it locally
 
-Requires Node 20+.
+Requires Node 22+ (`better-sqlite3` needs it).
 
 ```bash
 git clone https://github.com/gitmanluke/dataviz.git
