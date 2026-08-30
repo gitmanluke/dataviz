@@ -1,8 +1,7 @@
 import type { Column } from "@/lib/query-engine"
 import { isNumeric, isDateLike } from "@/lib/widget-detector"
 
-/** Infer a {name, type} for each column from the row values. Shared by the
- *  SnowLeopard and SQL engines. */
+/** Infer a {name, type} for each column from the row values. */
 export function inferColumns(rows: Array<Record<string, unknown>>): Column[] {
   if (rows.length === 0) return []
   return Object.keys(rows[0]).map(name => {

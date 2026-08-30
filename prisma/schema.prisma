@@ -11,15 +11,13 @@ datasource db {
 }
 
 model DataSource {
-  id           String   @id @default(cuid())
-  name         String
-  description  String?
-  type         String   @default("snowleopard") // "snowleopard" | "files" | "sheets"
-  datafileId   String? // snowleopard only
-  apiKeyCipher String? // snowleopard only — AES-256-GCM (lib/crypto.ts), never sent to the client
-  status       String   @default("connected")
-  createdAt    DateTime @default(now())
-  widgets      Widget[]
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  type        String   @default("files") // "files" | "sheets"
+  status      String   @default("connected")
+  createdAt   DateTime @default(now())
+  widgets     Widget[]
 
   // google sheets only
   sheetId         String? // the Google spreadsheet id

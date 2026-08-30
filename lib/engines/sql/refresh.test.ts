@@ -54,9 +54,9 @@ describe("runSql", () => {
     expect(r.truncated).toBe(true)
   })
 
-  it("rejects a non-file source", async () => {
+  it("rejects a source type that isn't backed by SQLite", async () => {
     await expect(
-      runSql("SELECT 1", { id: ID, type: "snowleopard" } as Parameters<typeof runSql>[1]),
+      runSql("SELECT 1", { id: ID, type: "postgres" } as Parameters<typeof runSql>[1]),
     ).rejects.toThrow(/can't be queried/i)
   })
 

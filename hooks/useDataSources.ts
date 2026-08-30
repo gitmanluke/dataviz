@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import type { DataSource, NewDataSource } from "@/lib/types"
+import type { DataSource } from "@/lib/types"
 
 async function readError(res: Response): Promise<string> {
   try {
@@ -32,19 +32,6 @@ export function useDataSources() {
     return () => {
       cancelled = true
     }
-  }, [])
-
-  // Verifies + persists server-side. Throws Error(message) on failure.
-  const add = useCallback(async (input: NewDataSource): Promise<DataSource> => {
-    const res = await fetch("/api/data-sources", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    })
-    if (!res.ok) throw new Error(await readError(res))
-    const created = (await res.json()) as DataSource
-    setDataSources(prev => [created, ...prev])
-    return created
   }, [])
 
   // Uploads CSV/.db files as a new "files" data source. Throws on failure.
@@ -106,5 +93,5 @@ export function useDataSources() {
     setDataSources(prev => prev.filter(ds => ds.id !== id))
   }, [])
 
-  return { dataSources, initialized, add, upload, addSheet, update, syncNow, remove }
+  return { dataSources, initialized, upload, addSheet, update, syncNow, remove }
 }

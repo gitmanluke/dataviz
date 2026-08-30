@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
-  Plus, CheckCircle, AlertCircle, Loader2, Trash2, Eye, EyeOff,
+  Plus, CheckCircle, AlertCircle, Loader2, Trash2,
   Database, Upload, ChevronRight, ChevronDown, FileSpreadsheet, FilePlus, Sheet, RefreshCw,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -43,8 +43,8 @@ function formatRelativeTime(iso: string): string {
 }
 
 export function DataSourcesClient() {
-  const { dataSources, initialized, add, upload, addSheet, update, syncNow, remove } = useDataSources()
-  const [dialog, setDialog] = useState<"none" | "snowleopard" | "upload" | "sheets">("none")
+  const { dataSources, initialized, upload, addSheet, update, syncNow, remove } = useDataSources()
+  const [dialog, setDialog] = useState<"none" | "upload" | "sheets">("none")
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [googleConnected, setGoogleConnected] = useState(false)
 
@@ -82,7 +82,7 @@ export function DataSourcesClient() {
       <div className="mb-8 flex items-start justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Data Sources</h1>
-          <p className="text-gray-600">Upload files or connect SnowLeopard, then ask questions of your data.</p>
+          <p className="text-gray-600">Upload files or connect Google Sheets, then ask questions of your data.</p>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -99,10 +99,6 @@ export function DataSourcesClient() {
             <DropdownMenuItem onSelect={() => setDialog("sheets")}>
               <Sheet className="w-4 h-4 mr-2" />
               Connect Google Sheets
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setDialog("snowleopard")}>
-              <Database className="w-4 h-4 mr-2" />
-              Connect SnowLeopard
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -148,11 +144,6 @@ export function DataSourcesClient() {
         )}
       </div>
 
-      <SnowLeopardDialog
-        open={dialog === "snowleopard"}
-        onClose={() => setDialog("none")}
-        add={add}
-      />
       <UploadDialog
         open={dialog === "upload"}
         onClose={() => setDialog("none")}
@@ -284,13 +275,6 @@ function SourceRow({
             <span className="inline-flex items-center gap-1.5">
               <Sheet className="w-4 h-4 text-green-600" />
               Google Sheets
-            </span>
-          )}
-          {!isFiles && !isSheets && (
-            <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">
-              {(ds.datafileId ?? "").length > 20
-                ? `${ds.datafileId!.slice(0, 8)}…${ds.datafileId!.slice(-8)}`
-                : ds.datafileId}
             </span>
           )}
         </td>
@@ -506,100 +490,6 @@ function UploadDialog({
           <Button variant="outline" onClick={() => { reset(); onClose() }} disabled={busy}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={busy}>
             {busy ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Uploading…</> : "Upload"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// --- snowleopard dialog ---------------------------------------------
-
-function SnowLeopardDialog({
-  open, onClose, add,
-}: {
-  open: boolean
-  onClose: () => void
-  add: (input: { name: string; apiKey: string; datafileId: string; description?: string }) => Promise<DataSource>
-}) {
-  const [form, setForm] = useState({ name: "", apiKey: "", datafileId: "", description: "" })
-  const [showKey, setShowKey] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const reset = () => {
-    setForm({ name: "", apiKey: "", datafileId: "", description: "" })
-    setShowKey(false); setBusy(false); setError(null)
-  }
-  const set = (k: keyof typeof form, v: string) => {
-    setForm(p => ({ ...p, [k]: v }))
-    setError(null)
-  }
-
-  const handleSubmit = async () => {
-    if (!form.name.trim() || !form.apiKey.trim() || !form.datafileId.trim()) {
-      return setError("Name, API key, and File ID are all required.")
-    }
-    setBusy(true)
-    setError(null)
-    try {
-      await add({
-        name: form.name.trim(),
-        apiKey: form.apiKey.trim(),
-        datafileId: form.datafileId.trim(),
-        description: form.description.trim() || undefined,
-      })
-      toast.success(`"${form.name.trim()}" added`)
-      reset()
-      onClose()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not connect.")
-      setBusy(false)
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={o => { if (!o && !busy) { reset(); onClose() } }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>Connect SnowLeopard</DialogTitle></DialogHeader>
-        <div className="space-y-4 py-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="sl-name">Name <span className="text-red-500">*</span></Label>
-            <Input id="sl-name" placeholder="e.g. Superheroes" value={form.name}
-              onChange={e => set("name", e.target.value)} disabled={busy} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="sl-key">SnowLeopard API Key <span className="text-red-500">*</span></Label>
-            <div className="relative">
-              <Input id="sl-key" type={showKey ? "text" : "password"} placeholder="sk-••••••••"
-                value={form.apiKey} onChange={e => set("apiKey", e.target.value)} disabled={busy} className="pr-10" />
-              <button type="button" onClick={() => setShowKey(v => !v)} tabIndex={-1}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="sl-file">File ID <span className="text-red-500">*</span></Label>
-            <Input id="sl-file" placeholder="e.g. df_abc123" value={form.datafileId}
-              onChange={e => set("datafileId", e.target.value)} disabled={busy} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="sl-desc">Description <span className="text-gray-400 font-normal">(optional)</span></Label>
-            <Textarea id="sl-desc" rows={2} value={form.description}
-              onChange={e => set("description", e.target.value)} disabled={busy} />
-          </div>
-          {error && (
-            <div className="flex items-start gap-2 rounded-md bg-red-50 border border-red-200 px-3 py-2.5">
-              <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-          )}
-        </div>
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => { reset(); onClose() }} disabled={busy}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={busy}>
-            {busy ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Verifying…</> : "Add"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -15,9 +15,9 @@ export interface QueryResult {
 }
 
 /**
- * A source of tabular data for a natural-language question. SnowLeopard is the
- * only implementation today; a direct-SQL or CSV engine could be added without
- * touching the route or the viz agent.
+ * A source of tabular data for a natural-language question. `sqlEngine`
+ * (`lib/engines/sql`) is the implementation; the interface keeps the route and
+ * the viz agent decoupled from how rows are fetched.
  */
 export interface QueryEngine {
   retrieve(userQuery: string, source: DataSourceRow): Promise<QueryResult>

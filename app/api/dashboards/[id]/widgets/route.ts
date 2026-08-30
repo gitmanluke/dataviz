@@ -56,8 +56,8 @@ export async function POST(
   const nextY = existing.reduce((max, w) => Math.max(max, w.y + w.h), 0)
   const size = defaultSizeFor(body.type)
 
-  // A widget can be refreshed only when its SQL is re-runnable — file and sheets
-  // sources. SnowLeopard SQL can't be re-run, so drop the query for those.
+  // Store the query only for source types whose SQL is re-runnable (files,
+  // sheets), so the widget can later be refreshed.
   let query: string | null = null
   const dataSourceId = body.dataSourceId ?? null
   if (body.query && dataSourceId) {
