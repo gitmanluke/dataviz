@@ -4,15 +4,15 @@
 
 **Ask your data a question in plain English. Get a dashboard.**
 
+![DataViz — asking a question, getting a chart, editing the widget](screenshots/nl-query.gif)
+
 DataViz is a local-first dashboard builder. Point it at a CSV, a SQLite file, or
 a Google Sheet; ask a question in natural language; it writes the SQL, runs it
 safely, and turns the answer into a chart you can arrange, edit, and refresh.
 Your data and dashboards never leave your machine.
 
-Built solo, end to end — including the natural-language-to-SQL pipeline (which
-replaced a paid third-party query API) and the Google Sheets OAuth integration.
-
-![DataViz — asking a question, getting a chart, editing the widget](screenshots/nl-query.gif)
+Built solo, end to end — the natural-language-to-SQL pipeline, the query-safety
+layer, and the Google Sheets OAuth integration are all hand-built.
 
 ---
 
