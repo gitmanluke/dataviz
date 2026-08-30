@@ -12,17 +12,13 @@ Your data and dashboards never leave your machine.
 Built solo, end to end — including the natural-language-to-SQL pipeline (which
 replaced a paid third-party query API) and the Google Sheets OAuth integration.
 
-<!-- Add screenshots/demo.gif and uncomment:
-![DataViz demo](screenshots/demo.gif)
--->
+![DataViz — asking a question, getting a chart, editing the widget](screenshots/nl-query.gif)
 
 ---
 
 ## Features
 
 ### Natural language → SQL → chart
-
-<!-- ![NL query](screenshots/nl-query.gif) -->
 
 Ask *"which channel drives the most revenue?"* and DataViz sends your data's
 schema to Claude, which writes a single `SELECT`. Before it runs, a validation
@@ -41,7 +37,7 @@ phrasing, with a deterministic heuristic as the always-available fallback.
 
 ### Bring your own data
 
-<!-- ![data sources](screenshots/data-sources.gif) -->
+![Uploading CSVs and inspecting the resulting tables](screenshots/data-sources.gif)
 
 - **Files** — upload one or more `.csv` / `.db` files. Each becomes a table in a
   per-source SQLite database; add, replace, or drop tables later.
@@ -50,7 +46,7 @@ phrasing, with a deterministic heuristic as the always-available fallback.
 
 ### Refreshable widgets
 
-<!-- ![refresh](screenshots/refresh.gif) -->
+![Editing a Google Sheet and refreshing the bound widget](screenshots/refresh.gif)
 
 Every widget remembers the query that built it. Hit **Refresh data** (or
 **Refresh all**) to re-run it — no LLM call. A Google Sheet source can also
@@ -59,8 +55,6 @@ app activity and gated by a Drive `modifiedTime` check, so a changed sheet
 quietly updates the dashboards that depend on it.
 
 ### Editable, drag-and-drop dashboards
-
-<!-- ![dashboard](screenshots/dashboard.gif) -->
 
 Arrange widgets on a grid. Every widget stores its raw rows plus an editable
 spec (chart type, x-axis, series, sort), so you can retune the visualization

@@ -1,15 +1,10 @@
 # Screenshots
 
-Drop demo GIFs / images here and uncomment the matching lines in the root README.
+Demo GIFs shown in the root README:
 
-Record in the natural user order against `sample/sales.csv` + `sample/products.csv`:
+- `nl-query.gif` — full flow: ask a question → chart renders → edit the widget
+- `data-sources.gif` — upload CSVs, inspect the resulting tables
+- `refresh.gif` — edit a Google Sheet cell → Refresh data → the chart moves
 
-1. `data-sources.gif` — Add data source → Upload files → pick both CSVs → expand
-   the row to show the `sales` and `products` tables
-2. `nl-query.gif` — ask *"which channel drives the most revenue?"* → SQL + chart
-   render → Add to Dashboard
-3. `dashboard.gif` — add a second widget (*"monthly revenue over time"*),
-   rearrange, resize, open the edit panel and switch chart type
-4. `refresh.gif` — edit a Google Sheet cell → widget ⋮ → Refresh data → the chart
-   moves
-5. `demo.gif` — hero (~20 s): empty dashboard → two questions → arrange → done
+Optimize large GIFs with `gifsicle -O3 --lossy=60 --colors 200 --resize-width 960
+in.gif -o out.gif`.
